@@ -20,15 +20,18 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 | Codec runtime | `axiom/core/codecs.py`: lookups plus the `EncodingPass()` state machine (`apply_quality_pass`) | `tests/test_codecs.py` |
 | Control layer (codecs) | `axiom/core/controls.py` + `controls_data.py` (generated): codec string, item sources, pass state machine, `controls_Enabled`/`controls_Selected` overrides incl. previous-codec fallback | `tests/test_control_parity.py` against the oracle's resolved state |
 | State oracle | the harness now also dumps the resolved ViewModel state (432 keys, incl. public fields) next to the golden command | `tests/test_control_parity.py` |
+| Control layer (quality/optimize) | `QualityControls`, `VideoBitRateDisplay`, `OptimizeControls` ported; `controls_Checked`/`controls_Expanded` rules extracted and applied | `tests/test_control_parity.py` (37 keys) |
+| Generator fixes | string item lists no longer coerced to numbers; ViewModel defaults now read from backing-field initialisers; property writes mirror the public backing field | regenerated `codecs_data.py` / `defaults.py` |
 
 ## Next (in this order)
 
 1. **Remaining control modules**: `FormatControls` / `MediaTypeControls` /
-   `MediaTypeControls_SelectedItems` (container driven item lists and enable flags),
-   `QualityControls` + `VideoBitRateDisplay` / `AudioBitRateDisplay` (CRF and bitrate
-   text), `OptimizeControls`, `PixelFormatControls`, `CutControls`,
-   `AudioStreamControls`.  The codec half is done; each of these has its own key set in
-   the state dump, so they can be added one at a time and verified the same way.
+   `MediaTypeControls_SelectedItems` (container driven item lists, the per-container
+   `Video_Optimize_SelectedItem` default and the media-type enable flags),
+   `PixelFormatControls`, `CutControls`, `AudioStreamControls` plus the audio side
+   (`AudioControls.CodecControls`/`QualityControls`/`AudioBitRateDisplay`).  Every
+   remaining key in the state dump is owned by one of these, so they can be added one at
+   a time and verified the same way.
 2. ~~**Codec tables**~~ - done, see above.
 3. **Single-pass generator** (`_1_Pass` + `Generate.Video.*` + `Generate.Audio.*` +
    `Generate.Streams` + `Generate.Format`) until `tests/test_parity.py` passes for the

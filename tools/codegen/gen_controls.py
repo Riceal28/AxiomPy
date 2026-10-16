@@ -55,6 +55,32 @@ PREVIOUS = re.compile(
     r"MainWindow\.(?P<previous>\w+)\s*\)"
 )
 
+FLAG = re.compile(
+    r"if\s*\(VM\.(?P<view>\w+)View\.(?P<gate>\w+)\s*==\s*true\)\s*\{\s*"
+    r"bool\?\s+(?P<key>\w+)\s*=\s*_codec_class\[[^\]]*\]\.controls_(?P<group>Checked|Expanded)"
+    r"\.FirstOrDefault\(\)\.(?P<prop>\w+);\s*"
+    r"if\s*\(!(?P=key)\.HasValue\)\s*VM\.\w+View\.(?P<field>\w+)\s*=\s*true;\s*"
+    r"else\s*VM\.\w+View\.(?P<field2>\w+)\s*=\s*(?P=key);\s*\}\s*"
+    r"else\s*\{\s*VM\.\w+View\.(?P<field3>\w+)\s*=\s*false;",
+    re.DOTALL,
+)
+
+
+def parse_flags(text: str) -> list[dict]:
+    """``controls_Checked`` / ``controls_Expanded`` overrides, gated on an enable flag."""
+    rules = []
+    for match in FLAG.finditer(text):
+        rules.append(
+            {
+                "group": match.group("group"),
+                "prop": match.group("prop"),
+                "gate": match.group("gate"),
+                "view": match.group("view"),
+                "field": match.group("field"),
+            }
+        )
+    return rules
+
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig", errors="replace")
@@ -114,10 +140,12 @@ def main() -> int:
         data[kind] = {
             "enabled": parse_enabled(text),
             "selected": parse_selected(text),
+            "flags": parse_flags(text),
         }
         print(
             f"{kind}: {len(data[kind]['enabled'])} enabled, "
-            f"{len(data[kind]['selected'])} selected rules"
+            f"{len(data[kind]['selected'])} selected, "
+            f"{len(data[kind]['flags'])} checked/expanded rules"
         )
 
     header = [

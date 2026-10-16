@@ -44,6 +44,11 @@ FIELD = re.compile(
     r"^[ \t]*public\s+(?P<type>[\w\.<>,\[\]\?\s]+?)\s+(?P<name>\w+)\s*(?:=\s*(?P<literal>[^;]+))?;",
     re.MULTILINE,
 )
+BACKING = re.compile(
+    r"^[ \t]*(?:public|private|protected|internal)?[ \t]*(?:static[ \t]+)?"
+    r"[\w<>\[\],\?\.]+[ \t]+_(?P<name>\w+)[ \t]*=[ \t]*(?P<value>[^;]+);",
+    re.MULTILINE,
+)
 DEFAULTS_METHOD = re.compile(
     r"public\s+(?:static\s+)?void\s+(?P<name>Load\w*Defaults)\s*\([^)]*\)\s*\{",
     re.MULTILINE,
@@ -130,6 +135,15 @@ def parse_file(path: Path) -> dict[str, object]:
             if parsed is not None:
                 value = parsed
         values.setdefault(match.group("name"), value)
+
+    # Defaults usually live on the backing field, not the property declaration.
+    for match in BACKING.finditer(text):
+        name = match.group("name")
+        if name not in values:
+            continue
+        parsed = python_literal(match.group("value"))
+        if parsed is not None:
+            values[name] = parsed
 
     # Explicit startup defaults win; they run when the ViewModel is constructed.
     for method in DEFAULTS_METHOD.finditer(text):

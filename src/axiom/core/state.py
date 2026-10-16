@@ -86,6 +86,14 @@ class AxiomState:
 
     def set(self, key: str, value: Any) -> None:
         self.values[key] = value
+        # The original ViewModel properties write through to a public backing field
+        # (``_Video_Pass_SelectedItem``); the harness state dump reports both, so keep
+        # them in sync.
+        group, _, field = key.partition(".")
+        if field and not field.startswith("_"):
+            alias = f"{group}._" + field
+            if alias in self.values:
+                self.values[alias] = value
 
     def update(self, overrides: Mapping[str, Any]) -> None:
         for key, value in overrides.items():

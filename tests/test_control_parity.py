@@ -44,8 +44,27 @@ CODEC_LAYER_KEYS = [
     "Video.Video_Optimize_Items",
     "Video.Video_Optimize_Tune_Items",
     "Video.Video_Optimize_Profile_Items",
+    "Video.Video_Optimize_Level_Items",
+    "Video.Video_Optimize_Tune_SelectedItem",
+    "Video.Video_Optimize_Tune_IsEnabled",
+    "Video.Video_Optimize_Profile_IsEnabled",
+    "Video.Video_Optimize_Level_IsEnabled",
+    "Video.Video_Optimize_IsExpanded",
+    "Video.Video_VBR_IsChecked",
+    "Video.Video_VBR_IsEnabled",
+    "Video.Video_Pass_IsEnabled",
+    "Video.Video_CRF_IsEnabled",
+    "Video.Video_BitRate_IsEnabled",
+    "Video.Video_MinRate_IsEnabled",
+    "Video.Video_MaxRate_IsEnabled",
+    "Video.Video_BufSize_IsEnabled",
+    "Video.Video_Scale_IsEnabled",
     "Audio.Audio_Codec",
 ]
+
+# Owned by FormatControls/MediaTypeControls (container driven), ported next:
+#   Video_Optimize_SelectedItem, Video_Optimize_Profile_SelectedItem,
+#   Video_Optimize_Level_SelectedItem, Video_Codec_Items, Video_*_Items
 
 
 def cases():

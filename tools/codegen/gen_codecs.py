@@ -85,7 +85,11 @@ def parse_value(raw: str):
 
 def parse_string_list(block: str) -> list:
     body = block[block.find("{") : match_brace(block, block.find("{")) + 1]
-    return [parse_value(literal) for literal in STRING_LITERAL.findall(body)]
+    # String lists must stay strings: "3.0" is a level label, not the number 3.0.
+    return [
+        literal.replace('\\"', '"').replace("\\\\", "\\")
+        for literal in STRING_LITERAL.findall(body)
+    ]
 
 
 def parse_object_list(block: str) -> list:

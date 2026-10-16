@@ -143,6 +143,18 @@ def codec_controls(state: AxiomState, kind: str, name: str) -> Dict[str, Any]:
             if chosen is not None:
                 state.set(field, chosen)
                 applied[rule["field"]] = chosen
+
+    # 6. controls_Checked / controls_Expanded, gated on the enable flag set above.
+    for rule in rules.get("flags", []):
+        rows = codecs.table(kind, name, "controls_" + rule["group"])
+        row = dict(rows[0]) if rows else {}
+        field = f"{rule['view']}.{rule['field']}"
+        if state.get(f"{rule['view']}.{rule['gate']}") is True:
+            value = row.get(rule["prop"])
+            state.set(field, True if value is None else bool(value))
+        else:
+            state.set(field, False)
+        applied[rule["field"]] = state.get(field)
     return applied
 
 
@@ -157,5 +169,203 @@ def resolve(state: AxiomState) -> AxiomState:
         name = state.get(f"{group}.{group}_Codec_SelectedItem")
         if name:
             codec_controls(state, kind, str(name))
+    if state.get("Video.Video_Codec_SelectedItem"):
+        video_optimize_controls(state)
+        video_quality_controls(state)
+        video_bitrate_display(state)
     return state
+
+
+# --------------------------------------------------------------------------------------
+# Video: quality / bitrate / optimize
+# --------------------------------------------------------------------------------------
+
+# The original tests these codec names before deciding whether VBR is available.
+VBR_DISABLED_CODECS = {
+    "VP8",
+    "x264",
+    "H264_AMF",
+    "H264_NVENC",
+    "H264_QSV",
+    "JPEG",
+    "AV1",
+    "FFV1",
+    "MagicYUV",
+    "HuffYUV",
+    "Copy",
+    "None",
+}
+
+OPTIMIZE_CODECS = {
+    "x264",
+    "x265",
+    "H264 AMF",
+    "HEVC AMF",
+    "H264 NVENC",
+    "HEVC NVENC",
+    "H264 QSV",
+    "HEVC QSV",
+}
+
+
+def _set(state: AxiomState, field: str, value: Any) -> None:
+    state.set(f"Video.{field}", value)
+
+
+def video_quality_controls(state: AxiomState) -> None:
+    """Port of Controls.Video.Controls.QualityControls."""
+    quality = state.get("Video.Video_Quality_SelectedItem")
+    codec = state.get("Video.Video_Codec_SelectedItem")
+
+    if quality == "Auto":
+        _set(state, "Video_Pass_IsEnabled", False)
+        _set(state, "Video_CRF_IsEnabled", False)
+        _set(state, "Video_CRF_Text", "")
+        _set(state, "Video_BitRate_IsEnabled", False)
+        _set(state, "Video_BitRate_Text", "")
+        _set(state, "Video_VBR_IsEnabled", False)
+        _set(state, "Video_VBR_IsChecked", False)
+        _set(state, "Video_MinRate_IsEnabled", False)
+        _set(state, "Video_MinRate_Text", "")
+        _set(state, "Video_MaxRate_IsEnabled", False)
+        _set(state, "Video_MaxRate_Text", "")
+        _set(state, "Video_BufSize_IsEnabled", False)
+        _set(state, "Video_BufSize_Text", "")
+        _set(state, "Video_Scale_IsEnabled", True)
+        return
+
+    if quality == "Lossless":
+        if codec in ("H264 NVENC", "HEVC NVENC"):
+            _set(state, "Video_EncodeSpeed_SelectedItem", "Lossless")
+        _set(state, "Video_Pass_IsEnabled", False)
+        _set(state, "Video_CRF_IsEnabled", False)
+        _set(state, "Video_BitRate_IsEnabled", False)
+        _set(state, "Video_VBR_IsEnabled", False)
+        _set(state, "Video_MinRate_IsEnabled", False)
+        _set(state, "Video_MaxRate_IsEnabled", False)
+        _set(state, "Video_BufSize_IsEnabled", False)
+        _set(state, "Video_Scale_IsEnabled", True)
+        return
+
+    if quality == "Custom":
+        _set(state, "Video_Pass_IsEnabled", True)
+        # Faithful to the original: the three comparisons are OR-ed, so this is always true.
+        if codec != "JPEG" or codec != "PNG" or codec != "WebP":
+            _set(state, "Video_CRF_IsEnabled", True)
+        _set(state, "Video_CRF_Text", "")
+        _set(state, "Video_BitRate_IsEnabled", True)
+        _set(state, "Video_BitRate_Text", "")
+        _set(state, "Video_VBR_IsEnabled", True)
+        _set(state, "Video_MinRate_IsEnabled", True)
+        _set(state, "Video_MinRate_Text", "")
+        _set(state, "Video_MaxRate_IsEnabled", True)
+        _set(state, "Video_MaxRate_Text", "")
+        _set(state, "Video_BufSize_IsEnabled", True)
+        _set(state, "Video_BufSize_Text", "")
+        _set(state, "Video_Scale_IsEnabled", True)
+        return
+
+    if quality == "None":
+        _set(state, "Video_Pass_IsEnabled", False)
+        _set(state, "Video_CRF_IsEnabled", False)
+        _set(state, "Video_BitRate_IsEnabled", False)
+        _set(state, "Video_VBR_IsEnabled", False)
+        _set(state, "Video_MinRate_IsEnabled", False)
+        _set(state, "Video_MaxRate_IsEnabled", False)
+        _set(state, "Video_BufSize_IsEnabled", False)
+        _set(state, "Video_Scale_IsEnabled", False)
+        return
+
+    # Every other quality (the named presets)
+    _set(state, "Video_Pass_IsEnabled", True)
+    _set(state, "Video_CRF_IsEnabled", False)
+    _set(state, "Video_BitRate_IsEnabled", False)
+    _set(state, "Video_VBR_IsEnabled", codec not in VBR_DISABLED_CODECS)
+    _set(state, "Video_MinRate_IsEnabled", False)
+    _set(state, "Video_MaxRate_IsEnabled", False)
+    _set(state, "Video_BufSize_IsEnabled", False)
+    _set(state, "Video_Scale_IsEnabled", True)
+
+
+def _quality_row(state: AxiomState) -> Dict[str, Any]:
+    items = state.get("Video.Video_Quality_Items") or []
+    selected = state.get("Video.Video_Quality_SelectedItem")
+    for item in items:
+        if isinstance(item, Mapping) and item.get("Name") == selected:
+            return dict(item)
+    return {}
+
+
+def video_bitrate_display(state: AxiomState) -> None:
+    """Port of Controls.Video.Controls.VideoBitRateDisplay."""
+    quality = state.get("Video.Video_Quality_SelectedItem")
+    if not quality or quality in ("Auto", "Lossless", "Custom", "None"):
+        return
+
+    selected_pass = state.get("Video.Video_Pass_SelectedItem")
+    row = _quality_row(state)
+
+    if selected_pass == "auto":
+        for field in (
+            "Video_CRF_Text",
+            "Video_BitRate_Text",
+            "Video_MinRate_Text",
+            "Video_MaxRate_Text",
+            "Video_BufSize_Text",
+        ):
+            _set(state, field, "")
+        return
+
+    if selected_pass == "CRF":
+        _set(state, "Video_BitRate_Text", row.get("Video_CRF_BitRate") or "")
+        _set(state, "Video_CRF_Text", row.get("CRF") or "")
+        _set(state, "Video_MinRate_Text", row.get("MinRate") or "")
+        _set(state, "Video_MaxRate_Text", row.get("MaxRate") or "")
+        _set(state, "Video_BufSize_Text", row.get("BufSize") or "")
+        return
+
+    if selected_pass in ("1 Pass", "2 Pass"):
+        _set(state, "Video_CRF_Text", "")
+        if state.get("Video.Video_VBR_IsChecked") is True:
+            _set(state, "Video_BitRate_Text", row.get("VBR") or "")
+        else:
+            _set(state, "Video_BitRate_Text", row.get("CBR") or "")
+        _set(state, "Video_MinRate_Text", row.get("MinRate") or "")
+        _set(state, "Video_MaxRate_Text", row.get("MaxRate") or "")
+        _set(state, "Video_BufSize_Text", row.get("BufSize") or "")
+
+
+def video_optimize_controls(state: AxiomState) -> None:
+    """Port of Controls.Video.Controls.OptimizeControls."""
+    codec = state.get("Video.Video_Codec_SelectedItem")
+    optimize = state.get("Video.Video_Optimize_SelectedItem")
+
+    if codec in OPTIMIZE_CODECS:
+        if optimize == "Custom":
+            _set(state, "Video_Optimize_Tune_IsEnabled", True)
+            _set(state, "Video_Optimize_Profile_IsEnabled", True)
+            _set(state, "Video_Optimize_Level_IsEnabled", True)
+        else:
+            _set(state, "Video_Optimize_Tune_IsEnabled", False)
+            _set(state, "Video_Optimize_Profile_IsEnabled", False)
+            _set(state, "Video_Optimize_Level_IsEnabled", False)
+    else:
+        _set(state, "Video_Optimize_Tune_IsEnabled", False)
+        _set(state, "Video_Optimize_Profile_IsEnabled", False)
+        _set(state, "Video_Optimize_Level_IsEnabled", False)
+
+    if optimize != "Custom":
+        items = state.get("Video.Video_Optimize_Items") or []
+        row: Dict[str, Any] = {}
+        for item in items:
+            if isinstance(item, Mapping) and item.get("Name") == optimize:
+                row = dict(item)
+                break
+        _set(state, "Video_Optimize_Tune_SelectedItem", row.get("Tune"))
+        _set(state, "Video_Optimize_Profile_SelectedItem", row.get("Profile"))
+        _set(state, "Video_Optimize_Level_SelectedItem", row.get("Level"))
+
+    # Special rule: coming from the webm container the original resets Optimize to None.
+    if state.flags.get("formatContainerPreviousItem") == "webm":
+        _set(state, "Video_Optimize_SelectedItem", "None")
 
