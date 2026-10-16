@@ -16,14 +16,20 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 | Probing | `axiom/core/probe.py`: the same `-show_entries` queries, returned as `MediaInfo` | smoke-run against local ffmpeg 8.0.1 |
 | Running | `axiom/core/runner.py`: external console wrapping (`cmd /k`, `/c`, PowerShell `-NoExit`), progress parsing, log file | manual smoke |
 | CLI | `python -m axiom.cli --case <file> --id <id> --print resolved|command` - same case format as the oracle | exercised against the smoke cases |
+| Codec tables | `axiom/core/codecs_data.py`, generated from the 40 `Codecs/**` files (19 video, 12 audio, 6 subtitle, 3 image) incl. per-codec `qualityPass` tables | `tests/test_codecs.py` |
+| Codec runtime | `axiom/core/codecs.py`: lookups plus the `EncodingPass()` state machine (`apply_quality_pass`) | `tests/test_codecs.py` |
 
 ## Next (in this order)
 
 1. **Control-layer resolution** (`Controls.Format/Video/Audio/Subtitles`) - fills the VM
    with codec/quality/optimize item tables.  The harness already replays the exact call
    order (`Program.ResolveControls`), so the port has a working reference for both the
-   behaviour and the call sequence.
-2. **Codec tables** (`Codecs/Video|Audio|Image|Subtitle`, 40 files) - declarative data.
+   behaviour and the call sequence.  The codec side of this is already available as data
+   (`codecs_data.CODECS`); what remains is the logic that copies it into the state and
+   the dependent-control rewrites (`MediaTypeControls`, `QualityControls`,
+   `OptimizeControls`, `PixelFormatControls`, `EncodingPassControls`, `CutControls`,
+   `AudioStreamControls`).
+2. ~~**Codec tables**~~ - done, see above.
 3. **Single-pass generator** (`_1_Pass` + `Generate.Video.*` + `Generate.Audio.*` +
    `Generate.Streams` + `Generate.Format`) until `tests/test_parity.py` passes for the
    smoke cases.

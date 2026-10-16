@@ -74,6 +74,9 @@ class AxiomState:
 
     def __init__(self, overrides: Mapping[str, Any] | None = None) -> None:
         self.values: MutableMapping[str, Any] = dict(DEFAULTS)
+        # Global control flags that the original kept as statics (e.g.
+        # Controls.Video.Controls.passUserSelected).
+        self.flags: MutableMapping[str, Any] = {}
         if overrides:
             self.update(overrides)
 

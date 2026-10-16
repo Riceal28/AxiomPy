@@ -26,14 +26,13 @@ from ..assembly import join_fragments
 from ..state import AxiomState
 
 PENDING_MODULES = (
+    "control-layer state resolution (Controls/**)",
     "format/cut/chapters",
     "video codec + encoding + quality + size + colour",
     "audio codec + quality + channels + metadata",
     "subtitles",
     "stream maps",
     "video/audio filters",
-    "codec tables (Codecs/**)",
-    "control-layer state resolution (Controls/**)",
 )
 
 
