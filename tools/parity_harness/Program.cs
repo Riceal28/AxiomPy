@@ -1,0 +1,287 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+using System.Text;
+using System.Web.Script.Serialization;
+using Axiom;
+using ViewModel;
+
+namespace Harness
+{
+    /// <summary>
+    /// Runs a JSON case matrix through the original Axiom generator sources and dumps the
+    /// resulting ffmpeg command lines.  Cases are resolved through the VM statics exactly
+    /// like the GUI does, so the output is a faithful oracle for the Python port.
+    /// </summary>
+    public static class Program
+    {
+        private static readonly JavaScriptSerializer Json =
+            new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 256 };
+
+        private static readonly Dictionary<string, Func<object>> Groups =
+            new Dictionary<string, Func<object>>
+            {
+                { "Main", () => VM.MainView },
+                { "Format", () => VM.FormatView },
+                { "Video", () => VM.VideoView },
+                { "Audio", () => VM.AudioView },
+                { "Subtitle", () => VM.SubtitleView },
+                { "FilterVideo", () => VM.FilterVideoView },
+                { "FilterAudio", () => VM.FilterAudioView },
+                { "Configure", () => VM.ConfigureView },
+            };
+
+        public static int Main(string[] args)
+        {
+            string casesPath = null;
+            string outPath = null;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] == "--cases" && i + 1 < args.Length) casesPath = args[++i];
+                else if (args[i] == "--out" && i + 1 < args.Length) outPath = args[++i];
+            }
+
+            if (casesPath == null || outPath == null)
+            {
+                Console.Error.WriteLine("usage: AxiomParity --cases <cases.json> --out <out.json>");
+                return 2;
+            }
+
+            var cases = Json.Deserialize<List<Dictionary<string, object>>>(File.ReadAllText(casesPath));
+            var results = new List<Dictionary<string, object>>();
+            foreach (var item in cases)
+            {
+                results.Add(RunCase(item));
+            }
+
+            File.WriteAllText(outPath, Json.Serialize(results), new UTF8Encoding(false));
+            Console.WriteLine("wrote " + results.Count + " goldens to " + outPath);
+            return 0;
+        }
+
+        private static Dictionary<string, object> RunCase(Dictionary<string, object> item)
+        {
+            var result = new Dictionary<string, object>();
+            string id = item.ContainsKey("id") ? Convert.ToString(item["id"]) : "unnamed";
+            result["id"] = id;
+            try
+            {
+                Reset();
+                foreach (var pair in Section(item, "state")) SetState(pair.Key, pair.Value);
+                foreach (var pair in Section(item, "ffprobe")) SetStatic(typeof(Analyze.FFprobe), pair.Key, pair.Value);
+                foreach (var pair in Section(item, "controls")) SetStatic(typeof(Controls.Configure), pair.Key, pair.Value);
+
+                result["nulls"] = NullMembers();
+
+                if (item.ContainsKey("preset") && item["preset"] != null)
+                {
+                    VM.MainView.Preset_SelectedItem = Convert.ToString(item["preset"]);
+                    Profiles.Presets.SetPreset();
+                    result["preset"] = VM.MainView.Preset_SelectedItem;
+                }
+
+                ResolveControls();
+
+                if (VM.MainView.Batch_IsChecked == true)
+                {
+                    Generate.FFmpeg.Batch.Generate_FFmpegArgs();
+                }
+                else
+                {
+                    Generate.FFmpeg.Generate_SingleArgs();
+                }
+
+                Generate.FFmpeg.ffmpegArgs = Generate.FFmpeg.ffmpegArgs ?? string.Empty;
+                result["args"] = Generate.FFmpeg.ffmpegArgs;
+                result["sorted"] = Generate.FFmpeg.ffmpegArgsSort;
+
+                MainWindow.scriptText = Generate.FFmpeg.ffmpegArgs;
+                if (VM.MainView.AutoSortScript_IsChecked == true)
+                {
+                    Controls.ScriptView.sort = false;
+                    MainWindow.Sort();
+                }
+                else
+                {
+                    VM.MainView.ScriptView_Text = Generate.FFmpeg.ffmpegArgs;
+                }
+
+                result["script"] = VM.MainView.ScriptView_Text;
+                result["messages"] = Dialog.Messages;
+            }
+            catch (Exception ex)
+            {
+                result["error"] = ex.ToString();
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Replays the control-layer resolution the GUI performs as the user picks a
+        /// container, media type, codecs and quality (this is what fills the VM with the
+        /// codec argument tables before a command is generated).
+        /// </summary>
+        private static void ResolveControls()
+        {
+            Controls.Format.Controls.FormatControls(VM.FormatView.Format_Container_SelectedItem);
+            Controls.Format.Controls.MediaTypeControls();
+            Controls.Format.Controls.MediaTypeControls_SelectedItems();
+            Controls.Format.Controls.CutControls();
+            Controls.Format.Controls.AudioStreamControls();
+
+            Controls.Video.Controls.CodecControls(VM.VideoView.Video_Codec_SelectedItem);
+            Controls.Video.Controls.EncodingPassControls();
+            Controls.Video.Controls.PixelFormatControls(
+                VM.FormatView.Format_MediaType_SelectedItem,
+                VM.VideoView.Video_Codec_SelectedItem,
+                VM.VideoView.Video_Quality_SelectedItem);
+            Controls.Video.Controls.OptimizeControls();
+            Controls.Video.Controls.QualityControls();
+            Controls.Video.Controls.VideoBitRateDisplay(
+                VM.VideoView.Video_Quality_Items,
+                VM.VideoView.Video_Quality_SelectedItem,
+                VM.VideoView.Video_Pass_SelectedItem);
+
+            Controls.Audio.Controls.CodecControls(VM.AudioView.Audio_Codec_SelectedItem);
+            Controls.Audio.Controls.QualityControls();
+            Controls.Audio.Controls.AudioBitRateDisplay(
+                VM.AudioView.Audio_Quality_Items,
+                VM.AudioView.Audio_Quality_SelectedItem);
+
+            Controls.Subtitles.Controls.CodecControls(VM.SubtitleView.Subtitle_Codec_SelectedItem);
+        }
+
+        /// <summary>
+        /// Nullable state that the WPF UI normally initialises (checkboxes, tri-state
+        /// toggles).  Reported so the Python port can model the real startup defaults.
+        /// </summary>
+        private static List<string> NullMembers()
+        {
+            var names = new List<string>();
+            foreach (var group in Groups)
+            {
+                object instance = group.Value();
+                foreach (var property in instance.GetType().GetProperties(
+                             BindingFlags.Public | BindingFlags.Instance))
+                {
+                    if (!property.CanRead) continue;
+                    Type type = property.PropertyType;
+                    if (Nullable.GetUnderlyingType(type) == null) continue;
+                    object value;
+                    try
+                    {
+                        value = property.GetValue(instance, null);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (value == null) names.Add(group.Key + "." + property.Name);
+                }
+            }
+
+            return names;
+        }
+
+        private static void Reset()
+        {
+            VM.MainView = new Main();
+            VM.FormatView = new Format();
+            VM.VideoView = new Video();
+            VM.AudioView = new Audio();
+            VM.SubtitleView = new Subtitle();
+            VM.FilterVideoView = new FilterVideo();
+            VM.FilterAudioView = new FilterAudio();
+            VM.ConfigureView = new Configure();
+
+            Generate.FFmpeg.ffmpegArgs = null;
+            Generate.FFmpeg.ffmpegArgsSort = null;
+            Generate.FFmpeg.ffmpeg = string.Empty;
+            MainWindow.inputDir = string.Empty;
+            MainWindow.inputFileName = string.Empty;
+            MainWindow.inputExt = string.Empty;
+            MainWindow.input = string.Empty;
+            MainWindow.outputDir = string.Empty;
+            MainWindow.outputFileName = string.Empty;
+            MainWindow.outputFileName_Original = string.Empty;
+            MainWindow.outputExt = string.Empty;
+            MainWindow.output = string.Empty;
+            MainWindow.scriptText = null;
+            MainWindow.Video_EncodeSpeed_PreviousItem = null;
+            Dialog.Messages = new List<string>();
+            Controls.ScriptView.sort = false;
+            Controls.Configure.threads = string.Empty;
+        }
+
+        private static IEnumerable<KeyValuePair<string, object>> Section(
+            Dictionary<string, object> item, string key)
+        {
+            if (!item.ContainsKey(key) || item[key] == null) yield break;
+            var section = item[key] as Dictionary<string, object>;
+            if (section == null) yield break;
+            foreach (var pair in section) yield return pair;
+        }
+
+        private static void SetState(string dotted, object value)
+        {
+            int dot = dotted.IndexOf('.');
+            if (dot < 0) throw new ArgumentException("state key must be Group.Property: " + dotted);
+            string group = dotted.Substring(0, dot);
+            string property = dotted.Substring(dot + 1);
+            if (!Groups.ContainsKey(group)) throw new ArgumentException("unknown group: " + group);
+            SetMember(Groups[group](), property, value);
+        }
+
+        private static void SetStatic(Type type, string name, object value)
+        {
+            SetMember(null, name, value, type);
+        }
+
+        private static void SetMember(object instance, string name, object value, Type type = null)
+        {
+            type = type ?? instance.GetType();
+            var flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
+            var property = type.GetProperty(name, flags);
+            if (property != null)
+            {
+                property.SetValue(instance, Coerce(value, property.PropertyType), null);
+                return;
+            }
+
+            var field = type.GetField(name, flags);
+            if (field != null)
+            {
+                field.SetValue(instance, Coerce(value, field.FieldType));
+                return;
+            }
+
+            throw new ArgumentException(string.Format("{0} has no member {1}", type.Name, name));
+        }
+
+        private static object Coerce(object value, Type target)
+        {
+            Type underlying = Nullable.GetUnderlyingType(target) ?? target;
+            if (value == null) return null;
+
+            if (typeof(IList).IsAssignableFrom(underlying) && value is IEnumerable && !(value is string))
+            {
+                var list = (IList)Activator.CreateInstance(underlying);
+                foreach (var entry in (IEnumerable)value)
+                {
+                    list.Add(Coerce(entry, underlying.GetGenericArguments()[0]));
+                }
+                return list;
+            }
+
+            if (underlying == typeof(string)) return Convert.ToString(value);
+            if (underlying.IsEnum) return Enum.Parse(underlying, Convert.ToString(value));
+            if (underlying == typeof(bool)) return Convert.ToBoolean(value);
+            return Convert.ChangeType(value, underlying, CultureInfo.InvariantCulture);
+        }
+    }
+}

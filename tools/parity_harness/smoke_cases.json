@@ -1,0 +1,72 @@
+[
+  {
+    "id": "webm-vp8-crf-25",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\my video.mkv",
+      "Format.Format_Container_SelectedItem": "webm",
+      "Format.Format_MediaType_SelectedItem": "Video",
+      "Format.Format_Cut_SelectedItem": "No",
+      "Video.Video_Codec_SelectedItem": "VP8",
+      "Video.Video_EncodeSpeed_SelectedItem": "Medium",
+      "Video.Video_Quality_SelectedItem": "Auto",
+      "Video.Video_Pass_SelectedItem": "CRF",
+      "Video.Video_CRF_Text": "25",
+      "Video.Video_Codec_IsEnabled": true,
+      "Audio.Audio_Codec_SelectedItem": "Vorbis",
+      "Audio.Audio_Quality_SelectedItem": "Auto",
+      "Audio.Audio_VBR_IsChecked": false,
+      "Audio.Audio_Metadata_Language_IsEnabled": false,
+      "Subtitle.Subtitle_Codec_SelectedItem": "None",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Configure.Threads_SelectedItem": "Optimal",
+      "Configure.FFmpegPath_Text": "<auto>"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "ac3",
+      "inputVideoBitRate": "5000000",
+      "inputAudioBitRate": "384000",
+      "inputSize": "1920x1080",
+      "inputDuration": "10.5",
+      "inputFrameRate": "24"
+    },
+    "controls": {
+      "threads": "-threads 0",
+      "maxthreads": "8"
+    }
+  },
+  {
+    "id": "mp4-x264-crf-23",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Format.Format_MediaType_SelectedItem": "Video",
+      "Video.Video_Codec_SelectedItem": "x264",
+      "Video.Video_EncodeSpeed_SelectedItem": "Fast",
+      "Video.Video_Quality_SelectedItem": "Auto",
+      "Video.Video_Pass_SelectedItem": "CRF",
+      "Video.Video_CRF_Text": "23",
+      "Video.Video_Codec_IsEnabled": true,
+      "Audio.Audio_Codec_SelectedItem": "AAC",
+      "Audio.Audio_Quality_SelectedItem": "Auto",
+      "Audio.Audio_VBR_IsChecked": false,
+      "Audio.Audio_Metadata_Language_IsEnabled": false,
+      "Subtitle.Subtitle_Codec_SelectedItem": "None",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Configure.Threads_SelectedItem": "Optimal"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "mpeg4",
+      "inputAudioCodec": "mp3",
+      "inputVideoBitRate": "1200000",
+      "inputAudioBitRate": "128000",
+      "inputSize": "1280x720",
+      "inputDuration": "30.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {
+      "threads": "-threads 0",
+      "maxthreads": "8"
+    }
+  }
+]

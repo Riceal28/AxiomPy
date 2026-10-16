@@ -1,0 +1,8 @@
+{
+  "args": "ffmpeg -y -i \"C:\\Input\\my video.mkv\" -c:v libvpx -quality best -cpu-used 0 -b:v 1500K -pix_fmt yuv420p -movflags faststart -pass 1 -an -sn -f webm -threads 0 NUL && ffmpeg -y -i \"C:\\Input\\my video.mkv\" -c:v libvpx -quality best -cpu-used 0 -b:v 1500K -pix_fmt yuv420p -movflags faststart -map 0:v:0? -pass 2 -c:a libvorbis -q:a 12 -map 0:a:0? -sn -map_chapters -1 -f webm -threads 0 \"C:\\Input\\my video.webm\"",
+  "id": "webm-vp8-crf-25",
+  "messages": [],
+  "nulls": [],
+  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\my video.mkv\" \r\n\r\n-c:v libvpx \r\n-quality best -cpu-used 0 -b:v 1500K \r\n-pix_fmt yuv420p \r\n-movflags faststart \r\n-pass 1 \r\n\r\n-an \r\n\r\n-sn \r\n\r\n-f webm \r\n\r\n-threads 0 \r\n\r\nNUL \r\n\r\n&& \r\n\r\nffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\my video.mkv\" \r\n\r\n-c:v libvpx \r\n-quality best -cpu-used 0 -b:v 1500K \r\n-pix_fmt yuv420p \r\n-movflags faststart \r\n-map 0:v:0? \r\n-pass 2 \r\n\r\n-c:a libvorbis \r\n-q:a 12 \r\n-map 0:a:0? \r\n-sn \r\n\r\n-map_chapters -1 \r\n\r\n-f webm \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\my video.webm\"",
+  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\my video.mkv\" \r\n\r\n-c:v libvpx \r\n-quality best -cpu-used 0 -b:v 1500K \r\n-pix_fmt yuv420p \r\n-movflags faststart \r\n-pass 1 \r\n\r\n-an \r\n\r\n-sn \r\n\r\n-f webm \r\n\r\n-threads 0 \r\n\r\nNUL \r\n\r\n&& \r\n\r\nffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\my video.mkv\" \r\n\r\n-c:v libvpx \r\n-quality best -cpu-used 0 -b:v 1500K \r\n-pix_fmt yuv420p \r\n-movflags faststart \r\n-map 0:v:0? \r\n-pass 2 \r\n\r\n-c:a libvorbis \r\n-q:a 12 \r\n-map 0:a:0? \r\n-sn \r\n\r\n-map_chapters -1 \r\n\r\n-f webm \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\my video.webm\""
+}

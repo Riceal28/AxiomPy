@@ -1,0 +1,173 @@
+{
+  "targets": [
+    {
+      "class": "MainWindow",
+      "namespace": "Axiom",
+      "kind": "class",
+      "base": "System.Windows.Window",
+      "files": [
+        "MainWindow.xaml.cs",
+        "MainWindow/Input.cs",
+        "MainWindow/Output.cs",
+        "MainWindow/Settings.cs",
+        "MainWindow/Script.cs",
+        "MainWindow/Format.cs",
+        "MainWindow/Video.cs",
+        "MainWindow/Audio.cs",
+        "MainWindow/Subtitles.cs",
+        "MainWindow/Filters.cs"
+      ],
+      "members": [
+        "appRootDir",
+        "appDataLocalDir",
+        "appDataRoamingDir",
+        "userProfile",
+        "documentsDir",
+        "videosDir",
+        "downloadDir",
+        "youtubedl",
+        "inputPreviousPath",
+        "inputDir",
+        "inputFileName",
+        "inputExt",
+        "input",
+        "outputPreviousPath",
+        "outputDir",
+        "outputFileName",
+        "outputFileName_Original",
+        "outputFileName_Tokens",
+        "outputExt",
+        "output",
+        "outputNewFileName",
+        "batchInputAuto",
+        "scriptText",
+        "Video_EncodeSpeed_PreviousItem",
+        "outputNaming_Defaults",
+        "WrapWithQuotes",
+        "RemoveLineBreaks",
+        "ReplaceLineBreaksWithSpaces",
+        "IsValidPath",
+        "IsValidFilename",
+        "NormalizeValue",
+        "IsWebURL",
+        "IsYouTubeURL",
+        "IsWebDownloadOnly",
+        "FFmpegPath",
+        "FFprobePath",
+        "FFplayPath",
+        "youtubedlPath",
+        "YouTubeDL_FFmpegPath",
+        "InputPath",
+        "BatchInputDirectory",
+        "OutputPath",
+        "OutputPath_SingleFile",
+        "OutputPath_Batch",
+        "FileRenamer",
+        "TokenAppender",
+        "TokenRemover",
+        "SettingsCheck",
+        "ThreadDetect",
+        "Sort",
+        "YouTubeDownloadFormat",
+        "YouTubeDownloadQuality",
+        "YouTubeDownloadURL",
+        "OutputFileNameSpacing",
+        "cropwindow",
+        "Audio_BitDepth_PreviousItem",
+        "Audio_Channel_PreviousItem",
+        "Audio_CompressionLevel_PreviousItem",
+        "Audio_Quality_PreviousItem",
+        "Audio_SampleRate_PreviousItem",
+        "Audio_Stream_PreviousItem",
+        "Audio_VBR_PreviousChecked",
+        "Format_Container_PreviousItem",
+        "SavePreviousItemCond",
+        "SelectedItem",
+        "Video_Optimize_Level_PreviousItem",
+        "Video_Optimize_PreviousItem",
+        "Video_Optimize_Profile_PreviousItem",
+        "Video_Optimize_Tune_PreviousItem",
+        "Video_Quality_PreviousItem"
+      ]
+    },
+    {
+      "class": "Presets",
+      "namespace": "Profiles",
+      "files": [
+        "Presets/Presets.cs"
+      ],
+      "members": [
+        "SetPreset"
+      ]
+    },
+    {
+      "class": "Controls",
+      "namespace": "Controls.Format",
+      "kind": "class",
+      "files": [
+        "Controls/FormatControls.cs"
+      ],
+      "members": [
+        "OutputFormatExt",
+        "FormatControls",
+        "MediaTypeControls",
+        "MediaTypeControls_SelectedItems",
+        "CutControls",
+        "AudioStreamControls"
+      ]
+    },
+    {
+      "class": "Controls",
+      "namespace": "Controls.Video",
+      "kind": "class",
+      "files": [
+        "Controls/VideoControls.cs"
+      ],
+      "members": [
+        "IVideoCodec",
+        "passUserSelected",
+        "CodecControls",
+        "QualityControls",
+        "PixelFormatControls",
+        "OptimizeControls",
+        "EncodingPassControls",
+        "InitializeCodecs",
+        "VideoBitRateDisplay",
+        "_codec_class",
+        "codecClasses"
+      ]
+    },
+    {
+      "class": "Controls",
+      "namespace": "Controls.Audio",
+      "kind": "class",
+      "files": [
+        "Controls/AudioControls.cs"
+      ],
+      "members": [
+        "IAudioCodec",
+        "CodecControls",
+        "QualityControls",
+        "InitializeCodecs",
+        "AudioBitRateDisplay",
+        "_codec_class",
+        "codecClasses"
+      ]
+    },
+    {
+      "class": "Controls",
+      "namespace": "Controls.Subtitles",
+      "kind": "class",
+      "files": [
+        "Controls/SubtitleControls.cs"
+      ],
+      "members": [
+        "ISubtitleCodec",
+        "CodecControls",
+        "InitializeCodecs",
+        "_codec_class",
+        "codecClasses"
+      ]
+    }
+  ]
+}
