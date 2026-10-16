@@ -18,17 +18,17 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 | CLI | `python -m axiom.cli --case <file> --id <id> --print resolved|command` - same case format as the oracle | exercised against the smoke cases |
 | Codec tables | `axiom/core/codecs_data.py`, generated from the 40 `Codecs/**` files (19 video, 12 audio, 6 subtitle, 3 image) incl. per-codec `qualityPass` tables | `tests/test_codecs.py` |
 | Codec runtime | `axiom/core/codecs.py`: lookups plus the `EncodingPass()` state machine (`apply_quality_pass`) | `tests/test_codecs.py` |
+| Control layer (codecs) | `axiom/core/controls.py` + `controls_data.py` (generated): codec string, item sources, pass state machine, `controls_Enabled`/`controls_Selected` overrides incl. previous-codec fallback | `tests/test_control_parity.py` against the oracle's resolved state |
+| State oracle | the harness now also dumps the resolved ViewModel state (432 keys, incl. public fields) next to the golden command | `tests/test_control_parity.py` |
 
 ## Next (in this order)
 
-1. **Control-layer resolution** (`Controls.Format/Video/Audio/Subtitles`) - fills the VM
-   with codec/quality/optimize item tables.  The harness already replays the exact call
-   order (`Program.ResolveControls`), so the port has a working reference for both the
-   behaviour and the call sequence.  The codec side of this is already available as data
-   (`codecs_data.CODECS`); what remains is the logic that copies it into the state and
-   the dependent-control rewrites (`MediaTypeControls`, `QualityControls`,
-   `OptimizeControls`, `PixelFormatControls`, `EncodingPassControls`, `CutControls`,
-   `AudioStreamControls`).
+1. **Remaining control modules**: `FormatControls` / `MediaTypeControls` /
+   `MediaTypeControls_SelectedItems` (container driven item lists and enable flags),
+   `QualityControls` + `VideoBitRateDisplay` / `AudioBitRateDisplay` (CRF and bitrate
+   text), `OptimizeControls`, `PixelFormatControls`, `CutControls`,
+   `AudioStreamControls`.  The codec half is done; each of these has its own key set in
+   the state dump, so they can be added one at a time and verified the same way.
 2. ~~**Codec tables**~~ - done, see above.
 3. **Single-pass generator** (`_1_Pass` + `Generate.Video.*` + `Generate.Audio.*` +
    `Generate.Streams` + `Generate.Format`) until `tests/test_parity.py` passes for the

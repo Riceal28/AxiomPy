@@ -212,6 +212,12 @@ DEFAULTS: dict[str, object] = {
     'Video.Video_Crop_X_Text': '',
     'Video.Video_Crop_Y_Text': '',
     'Video.Video_CropClear_Text': '',
+    'Video.Video_Codec': '',
+    'Video._Video_Optimize_Tune_SelectedItem': '',
+    'Video._Video_Optimize_Profile_SelectedItem': '',
+    'Video._Video_Optimize_Level_SelectedItem': '',
+    'Video._Video_ScreenFormat_SelectedItem': '',
+    'Video._Video_AspectRatio_SelectedItem': '',
 
     # --- Audio ---
     'Audio.PropertyChanged': None,
@@ -275,6 +281,9 @@ DEFAULTS: dict[str, object] = {
     'Audio.Audio_Metadata_Language_IsEnabled': None,
     'Audio.Audio_Delay_Text': '',
     'Audio.Audio_Delay_IsEnabled': False,
+    'Audio.Audio_Codec': '',
+    'Audio._Audio_Quality_SelectedItem': '',
+    'Audio._Audio_ListView_IsEnabled': None,
 
     # --- Subtitle ---
     'Subtitle.PropertyChanged': None,
@@ -305,6 +314,14 @@ DEFAULTS: dict[str, object] = {
     'Subtitle.Subtitle_Metadata_Language_IsEnabled': False,
     'Subtitle.Subtitle_Delay_Text': '',
     'Subtitle.Subtitle_Delay_IsEnabled': False,
+    'Subtitle.Subtitle_Codec': '',
+    'Subtitle._Subtitle_Codec_SelectedIndex': 0,
+    'Subtitle._Subtitle_Codec_SelectedItem': '',
+    'Subtitle._Subtitle_Codec_IsEnabled': None,
+    'Subtitle._Subtitle_Stream_SelectedIndex': 0,
+    'Subtitle._Subtitle_Stream_SelectedItem': '',
+    'Subtitle._Subtitle_Stream_IsEnabled': None,
+    'Subtitle._Subtitle_ListView_IsEnabled': None,
 
     # --- FilterVideo ---
     'FilterVideo.PropertyChanged': None,
@@ -516,4 +533,4 @@ DEFAULTS: dict[str, object] = {
 
 }
 
-PROPERTY_COUNT = 491
+PROPERTY_COUNT = 508

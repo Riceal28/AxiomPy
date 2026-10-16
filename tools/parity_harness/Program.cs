@@ -85,6 +85,8 @@ namespace Harness
 
                 ResolveControls();
 
+                result["state"] = DumpState();
+
                 if (VM.MainView.Batch_IsChecked == true)
                 {
                     Generate.FFmpeg.Batch.Generate_FFmpegArgs();
@@ -118,6 +120,81 @@ namespace Harness
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Snapshot of the resolved control state.  This is the specification the Python
+        /// control layer has to reproduce: scalars as-is, item lists as their names.
+        /// </summary>
+        private static Dictionary<string, object> DumpState()
+        {
+            var dump = new Dictionary<string, object>();
+            foreach (var group in Groups)
+            {
+                object instance = group.Value();
+                foreach (var property in instance.GetType().GetProperties(
+                             BindingFlags.Public | BindingFlags.Instance))
+                {
+                    if (!property.CanRead) continue;
+                    object value;
+                    try
+                    {
+                        value = property.GetValue(instance, null);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    string key = group.Key + "." + property.Name;
+                    if (value == null)
+                    {
+                        dump[key] = null;
+                    }
+                    else if (value is string || value is bool || value is int || value is double)
+                    {
+                        dump[key] = value;
+                    }
+                    else if (value is IEnumerable enumerable)
+                    {
+                        var items = new List<object>();
+                        foreach (var item in enumerable)
+                        {
+                            if (item == null) { items.Add(null); continue; }
+                            if (item is string) { items.Add((string)item); continue; }
+                            var nameProperty = item.GetType().GetProperty("Name");
+                            items.Add(nameProperty != null
+                                ? Convert.ToString(nameProperty.GetValue(item, null))
+                                : item.ToString());
+                        }
+
+                        dump[key] = items;
+                    }
+                }
+
+                // The ViewModel also exposes plain public fields (e.g. Video_Codec).
+                foreach (var field in instance.GetType().GetFields(
+                             BindingFlags.Public | BindingFlags.Instance))
+                {
+                    object value;
+                    try
+                    {
+                        value = field.GetValue(instance);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    string fieldKey = group.Key + "." + field.Name;
+                    if (value is string || value is bool || value is int || value is double)
+                    {
+                        dump[fieldKey] = value;
+                    }
+                }
+            }
+
+            return dump;
         }
 
         /// <summary>

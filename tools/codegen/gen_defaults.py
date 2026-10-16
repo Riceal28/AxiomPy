@@ -40,6 +40,10 @@ PROPERTY = re.compile(
     re.MULTILINE,
 )
 ASSIGNMENT = re.compile(r"^\s*[A-Za-z_]*\.?(?P<name>\w+)\s*=\s*(?P<value>[^;]+);", re.MULTILINE)
+FIELD = re.compile(
+    r"^[ \t]*public\s+(?P<type>[\w\.<>,\[\]\?\s]+?)\s+(?P<name>\w+)\s*(?:=\s*(?P<literal>[^;]+))?;",
+    re.MULTILINE,
+)
 DEFAULTS_METHOD = re.compile(
     r"public\s+(?:static\s+)?void\s+(?P<name>Load\w*Defaults)\s*\([^)]*\)\s*\{",
     re.MULTILINE,
@@ -113,6 +117,19 @@ def parse_file(path: Path) -> dict[str, object]:
             if parsed is not None:
                 value = parsed
         values.setdefault(name, value)
+
+    # Public fields are part of the state too (e.g. Video_Codec, Audio_Codec).
+    for match in FIELD.finditer(text):
+        prefix = text[: match.start()]
+        if prefix.count("{") - prefix.count("}") != 2:
+            continue
+        value = clr_default(match.group("type").strip())
+        literal = match.group("literal")
+        if literal is not None:
+            parsed = python_literal(literal)
+            if parsed is not None:
+                value = parsed
+        values.setdefault(match.group("name"), value)
 
     # Explicit startup defaults win; they run when the ViewModel is constructed.
     for method in DEFAULTS_METHOD.finditer(text):
