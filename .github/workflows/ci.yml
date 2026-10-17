@@ -40,7 +40,19 @@ jobs:
         run: python -m compileall -q src
 
       - name: Run tests
-        run: pytest -q -p no:cacheprovider
+        shell: pwsh
+        run: |
+          pytest -q --tb=short -p no:cacheprovider 2>&1 |
+            Tee-Object -FilePath pytest-output.txt
+          if ($LASTEXITCODE -ne 0) {
+            $text = Get-Content -LiteralPath pytest-output.txt -Raw
+            if ($text.Length -gt 6000) {
+              $text = $text.Substring($text.Length - 6000)
+            }
+            $text = $text.Replace("%", "%25").Replace("`r", "%0D").Replace("`n", "%0A")
+            Write-Output "::error title=pytest failure::$text"
+            exit 1
+          }
 
       - name: Check installed dependencies
         run: python -m pip check
