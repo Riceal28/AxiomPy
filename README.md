@@ -5,8 +5,9 @@ FFmpeg GUI.  The original WPF application stays untouched next door and is used 
 reference implementation.
 
 > Status: **M1 in progress.**  The C# parity harness is working and produces byte-exact
-> golden command lines; the Python core is being ported module by module against it.
-> See [docs/STATUS.md](docs/STATUS.md) for the exact state of each module.
+> golden command lines.  The full control layer (container/media-type/codec/cut/quality
+> resolution) now matches the oracle across a 60-case matrix; the command generator is
+> the next module.  See [docs/STATUS.md](docs/STATUS.md) for details.
 
 ## Layout
 

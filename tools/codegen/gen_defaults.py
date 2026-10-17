@@ -39,7 +39,10 @@ PROPERTY = re.compile(
     r"(?:\{\s*get;\s*set;\s*\}|=\s*(?P<literal>[^;]+);|(?=\r?\n[ \t]*\{))",
     re.MULTILINE,
 )
-ASSIGNMENT = re.compile(r"^\s*[A-Za-z_]*\.?(?P<name>\w+)\s*=\s*(?P<value>[^;]+);", re.MULTILINE)
+ASSIGNMENT = re.compile(
+    r"^\s*(?:[A-Za-z_]\w*\.)*(?P<name>\w+)\s*=\s*(?P<value>[^;]+);",
+    re.MULTILINE,
+)
 FIELD = re.compile(
     r"^[ \t]*public\s+(?P<type>[\w\.<>,\[\]\?\s]+?)\s+(?P<name>\w+)\s*(?:=\s*(?P<literal>[^;]+))?;",
     re.MULTILINE,
@@ -71,9 +74,86 @@ def method_body(text: str, start: int) -> str:
     return text[start:]
 
 
+COLLECTION = re.compile(
+    r"^new\s+(?:ObservableCollection|List)<[^>]+>\s*\(\s*\)\s*\{(?P<body>.*)\}\s*$",
+    re.DOTALL,
+)
+OBJECT_ENTRY = re.compile(
+    r"^new\s+[\w\.<>]+\s*\(\s*\)\s*\{(?P<body>.*)\}\s*$", re.DOTALL
+)
+
+
+def strip_comments(text: str) -> str:
+    """Remove C# line comments, ignoring ``//`` inside string literals."""
+    out: list[str] = []
+    index = 0
+    in_string = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            out.append(char)
+            if char == "\\" and index + 1 < len(text):
+                out.append(text[index + 1])
+                index += 2
+                continue
+            if char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            out.append(char)
+            index += 1
+            continue
+        if text.startswith("//", index):
+            newline = text.find("\n", index)
+            if newline == -1:
+                break
+            index = newline
+            continue
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def split_top_level(text: str, separator: str = ",") -> list[str]:
+    """Split on ``separator`` outside strings and (), {}, []."""
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    in_string = False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            if char == "\\":
+                index += 2
+                continue
+            if char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "({[":
+            depth += 1
+        elif char in ")}]":
+            depth -= 1
+        elif char == separator and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+        index += 1
+    tail = text[start:]
+    if tail.strip():
+        parts.append(tail)
+    return parts
+
+
 def python_literal(raw: str):
     """Convert a C# literal / simple expression into a Python value."""
     value = raw.strip()
+    if re.fullmatch(r"new\s+(?:ObservableCollection|List)<[^>]+>\s*\(\s*\)", value):
+        return []
     if value in ("true", "True"):
         return True
     if value in ("false", "False"):
@@ -85,9 +165,33 @@ def python_literal(raw: str):
         return string_match.group(1).replace('""', '"')
     string_match = re.fullmatch(r'"(.*)"', value, re.DOTALL)
     if string_match:
-        return string_match.group(1).replace('\\"', '"')
+        return (
+            string_match.group(1)
+            .replace('\\"', '"')
+            .replace("\\\\", "\\")
+        )
     if re.fullmatch(r"-?\d+(\.\d+)?", value):
         return float(value) if "." in value else int(value)
+    collection = COLLECTION.match(value)
+    if collection:
+        entries: list[object] = []
+        for entry in split_top_level(strip_comments(collection.group("body"))):
+            entry = entry.strip()
+            if not entry:
+                continue
+            parsed = python_literal(entry)
+            if parsed is not None:
+                entries.append(parsed)
+        return entries
+    obj = OBJECT_ENTRY.match(value)
+    if obj:
+        row: dict[str, object] = {}
+        for entry in split_top_level(strip_comments(obj.group("body"))):
+            key, separator, raw_value = entry.partition("=")
+            if not separator:
+                continue
+            row[key.strip()] = python_literal(raw_value)
+        return row
     return None  # complex initialiser: fall back to the CLR default for the type
 
 
@@ -98,8 +202,10 @@ def clr_default(type_name: str):
         return False
     if "int" in type_name or "double" in type_name:
         return 0
+    # In C# an uninitialised reference type is null; ViewModel constructors and
+    # Load*Defaults assign the real "" defaults where the UI expects them.
     if type_name in ("string", "String"):
-        return ""
+        return None
     return None
 
 
@@ -155,6 +261,13 @@ def parse_file(path: Path) -> dict[str, object]:
             parsed = python_literal(assign.group("value"))
             if parsed is not None:
                 values[name] = parsed
+
+    # Properties write through to their public/private backing field.  The harness
+    # dumps both, so keep the pair in sync exactly like AxiomState.set() does.
+    for name in list(values):
+        alias = "_" + name
+        if not name.startswith("_") and alias in values:
+            values[alias] = values[name]
     return values
 
 

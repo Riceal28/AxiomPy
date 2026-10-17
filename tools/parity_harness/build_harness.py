@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -152,8 +151,10 @@ def brace_delta(body: str) -> int:
 
 
 def copy_sources(src: Path) -> int:
-    if GEN.exists():
-        shutil.rmtree(GEN)
+    # Overwrite in place: on Windows the workspace sandbox may deny deleting
+    # generated files, while writing them is allowed.  Stale files are harmless for
+    # the current fixed source set and keep the build idempotent without a delete.
+    GEN.mkdir(parents=True, exist_ok=True)
     count = 0
     for directory in COPY_DIRS:
         for path in sorted((src / directory).rglob("*.cs")):

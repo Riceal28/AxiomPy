@@ -26,8 +26,6 @@ from ..assembly import join_fragments
 from ..state import AxiomState
 
 PENDING_MODULES = (
-    "control layer: MediaTypeControls/MediaTypeControls_SelectedItems, PixelFormatControls, "
-    "CutControls, AudioStreamControls, audio quality controls",
     "format/cut/chapters",
     "video codec + encoding + quality + size + colour",
     "audio codec + quality + channels + metadata",
@@ -50,8 +48,10 @@ def generate(state: AxiomState) -> str:
 
 
 def resolve_controls(state: AxiomState) -> AxiomState:
-    """Port target for ``Controls.Format/Video/Audio/Subtitles`` resolution."""
-    raise NotImplementedError("control-layer resolution is being ported")
+    """Resolve the container/media-type/codec/quality state like the GUI does."""
+    from ..controls import resolve
+
+    return resolve(state)
 
 
 __all__ = ["generate", "resolve_controls", "join_fragments"]

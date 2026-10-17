@@ -73,7 +73,35 @@ def match_brace(text: str, open_index: int) -> int:
 
 def strip_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-    return re.sub(r"^[ \t]*//.*$", "", text, flags=re.MULTILINE)
+    out: list[str] = []
+    index = 0
+    in_string = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            out.append(char)
+            if char == "\\" and index + 1 < len(text):
+                out.append(text[index + 1])
+                index += 2
+                continue
+            if char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            out.append(char)
+            index += 1
+            continue
+        if text.startswith("//", index):
+            newline = text.find("\n", index)
+            if newline == -1:
+                break
+            index = newline
+            continue
+        out.append(char)
+        index += 1
+    return "".join(out)
 
 
 def parse_value(raw: str):
@@ -152,6 +180,11 @@ def parse_encoding_pass(body: str) -> dict:
     table = {}
     branches = [(match.group("name"), match.end()) for match in CASE.finditer(body)]
     default_match = re.search(r"default\s*:", body)
+    if not branches and not default_match:
+        # Codecs such as the video "None" option have a single unconditional
+        # EncodingPass body instead of a quality switch.
+        table["default"] = parse_statements(body)
+        return table
     for index, (name, start) in enumerate(branches):
         if index + 1 < len(branches):
             end = branches[index + 1][1] - len(branches[index + 1][0]) - 8

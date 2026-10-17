@@ -23,6 +23,13 @@ KIND_TO_GROUP = {
 
 def lookup(kind: str, name: str) -> Dict[str, Any]:
     """Return the codec table for ``name`` (matches the combo box label)."""
+    # The original video control class keeps the image codecs (JPEG/PNG/WebP) in
+    # the same dictionary as VP8/x264/..., so a video codec selection may resolve
+    # to the image table.
+    if kind == "video" and name not in CODECS.get("video", {}) and name in CODECS.get(
+        "image", {}
+    ):
+        kind = "image"
     table = CODECS.get(kind)
     if table is None:
         raise KeyError(f"unknown codec kind: {kind}")
@@ -36,7 +43,9 @@ def names(kind: str) -> list[str]:
 
 
 def has(kind: str, name: str) -> bool:
-    return name in CODECS.get(kind, {})
+    if name in CODECS.get(kind, {}):
+        return True
+    return kind == "video" and name in CODECS.get("image", {})
 
 
 def table(kind: str, name: str, section: str) -> list:

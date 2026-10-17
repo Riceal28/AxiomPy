@@ -1,0 +1,690 @@
+[
+  {
+    "id": "ctl-webm-vp8",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "webm",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "ac3", "inputVideoBitRate": "5000000", "inputAudioBitRate": "384000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-x264",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "ac3", "inputVideoBitRate": "5000000", "inputAudioBitRate": "384000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-x264",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "3000000", "inputAudioBitRate": "192000", "inputSize": "1280x720", "inputDuration": "5.0", "inputFrameRate": "30"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-m2v-mpeg2",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mpg",
+      "Format.Format_Container_SelectedItem": "m2v",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "mpeg2video", "inputAudioCodec": "mp2", "inputVideoBitRate": "8000000", "inputAudioBitRate": "224000", "inputSize": "720x576", "inputDuration": "4.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mpg-mpeg2",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.avi",
+      "Format.Format_Container_SelectedItem": "mpg",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "mpeg4", "inputAudioCodec": "mp3", "inputVideoBitRate": "2000000", "inputAudioBitRate": "128000", "inputSize": "720x480", "inputDuration": "6.0", "inputFrameRate": "30"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-avi-mpeg4",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mpg",
+      "Format.Format_Container_SelectedItem": "avi",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "mpeg2video", "inputAudioCodec": "mp2", "inputVideoBitRate": "5000000", "inputAudioBitRate": "224000", "inputSize": "720x576", "inputDuration": "6.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-ogv-theora",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "ogv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "2000000", "inputAudioBitRate": "128000", "inputSize": "1280x720", "inputDuration": "7.0", "inputFrameRate": "30"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp3-lame",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.flac",
+      "Format.Format_Container_SelectedItem": "mp3",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "flac", "inputVideoBitRate": "", "inputAudioBitRate": "900000", "inputSize": "", "inputDuration": "180.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-m4a-aac",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.flac",
+      "Format.Format_Container_SelectedItem": "m4a",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "flac", "inputVideoBitRate": "", "inputAudioBitRate": "900000", "inputSize": "", "inputDuration": "180.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-ogg-opus",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.wav",
+      "Format.Format_Container_SelectedItem": "ogg",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "pcm_s16le", "inputVideoBitRate": "", "inputAudioBitRate": "1536000", "inputSize": "", "inputDuration": "60.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-flac-flac",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.wav",
+      "Format.Format_Container_SelectedItem": "flac",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "pcm_s16le", "inputVideoBitRate": "", "inputAudioBitRate": "1536000", "inputSize": "", "inputDuration": "60.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-wav-pcm",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.flac",
+      "Format.Format_Container_SelectedItem": "wav",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "flac", "inputVideoBitRate": "", "inputAudioBitRate": "900000", "inputSize": "", "inputDuration": "60.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-jpg-image",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frame.png",
+      "Format.Format_Container_SelectedItem": "jpg",
+      "Format.Format_CutStart_Hours_Text": "00",
+      "Format.Format_CutStart_Minutes_Text": "00",
+      "Format.Format_CutStart_Seconds_Text": "00",
+      "Format.Format_CutStart_Milliseconds_Text": "000",
+      "Format.Format_FrameStart_Text": "1",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "png", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1920x1080", "inputDuration": "0.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-png-image",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frame.jpg",
+      "Format.Format_Container_SelectedItem": "png",
+      "Format.Format_CutStart_Hours_Text": "00",
+      "Format.Format_CutStart_Minutes_Text": "00",
+      "Format.Format_CutStart_Seconds_Text": "00",
+      "Format.Format_CutStart_Milliseconds_Text": "000",
+      "Format.Format_FrameStart_Text": "1",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "mjpeg", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1920x1080", "inputDuration": "0.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-webp-image",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frame.png",
+      "Format.Format_Container_SelectedItem": "webp",
+      "Format.Format_CutStart_Hours_Text": "00",
+      "Format.Format_CutStart_Minutes_Text": "00",
+      "Format.Format_CutStart_Seconds_Text": "00",
+      "Format.Format_CutStart_Milliseconds_Text": "000",
+      "Format.Format_FrameStart_Text": "1",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "png", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1920x1080", "inputDuration": "0.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-jpg-sequence",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frames\\%04d.png",
+      "Format.Format_Container_SelectedItem": "jpg",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Format.Format_MediaType_SelectedItem": "Sequence"},
+    "ffprobe": {"inputVideoCodec": "png", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1920x1080", "inputDuration": "5.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-png-sequence",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frames\\%04d.jpg",
+      "Format.Format_Container_SelectedItem": "png",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Format.Format_MediaType_SelectedItem": "Sequence"},
+    "ffprobe": {"inputVideoCodec": "mjpeg", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1280x720", "inputDuration": "5.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-webp-sequence",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frames\\%04d.png",
+      "Format.Format_Container_SelectedItem": "webp",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Format.Format_MediaType_SelectedItem": "Sequence"},
+    "ffprobe": {"inputVideoCodec": "png", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1280x720", "inputDuration": "5.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-x265",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "x265", "Video.Video_Quality_SelectedItem": "Medium"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-h264-nvenc",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "H264 NVENC", "Video.Video_Quality_SelectedItem": "High"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-hevc-nvenc",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "HEVC NVENC", "Video.Video_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-av1",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "AV1", "Video.Video_Quality_SelectedItem": "High"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-vp9",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "VP9", "Video.Video_Quality_SelectedItem": "Medium"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-copy",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "Copy", "Video.Video_Quality_SelectedItem": "Auto"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-none",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "None", "Video.Video_Quality_SelectedItem": "None"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-lossless",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-custom",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "1 Pass",
+      "Video.Video_BitRate_Text": "4500",
+      "Video.Video_MinRate_Text": "4000",
+      "Video.Video_MaxRate_Text": "8000",
+      "Video.Video_BufSize_Text": "9000",
+      "Video.Video_VBR_IsChecked": true
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-quality-high",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "High",
+      "Video.Video_Pass_SelectedItem": "1 Pass",
+      "Video.Video_VBR_IsChecked": true
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-optimize-custom",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Optimize_SelectedItem": "Custom",
+      "Video.Video_Optimize_Tune_SelectedItem": "film",
+      "Video.Video_Optimize_Profile_SelectedItem": "high",
+      "Video.Video_Optimize_Level_SelectedItem": "4.1"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-aac-custom",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Audio.Audio_Channel_SelectedItem": "Stereo",
+      "Audio.Audio_Quality_SelectedItem": "192",
+      "Audio.Audio_VBR_IsChecked": false,
+      "Audio.Audio_SampleRate_SelectedItem": "48k",
+      "Audio.Audio_BitDepth_SelectedItem": "auto"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "ac3", "inputVideoBitRate": "5000000", "inputAudioBitRate": "384000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-ac3",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "AC3", "Audio.Audio_Quality_SelectedItem": "384"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-opus",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "Opus", "Audio.Audio_Quality_SelectedItem": "128"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-flac",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "FLAC", "Audio.Audio_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-dts",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "DTS", "Audio.Audio_Quality_SelectedItem": "1536"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "ac3", "inputVideoBitRate": "5000000", "inputAudioBitRate": "384000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-audio-none",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "None"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-audio-copy",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "Copy"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-m4a-alac",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.flac",
+      "Format.Format_Container_SelectedItem": "m4a",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "ALAC", "Audio.Audio_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "flac", "inputVideoBitRate": "", "inputAudioBitRate": "900000", "inputSize": "", "inputDuration": "180.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-m4a-mute",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\song.flac",
+      "Format.Format_Container_SelectedItem": "m4a",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Quality_SelectedItem": "Mute"},
+    "ffprobe": {"inputVideoCodec": "", "inputAudioCodec": "flac", "inputVideoBitRate": "", "inputAudioBitRate": "900000", "inputSize": "", "inputDuration": "180.0", "inputFrameRate": ""},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-sub-movtext",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-sub-ssa",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-sub-burn",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Subtitle.Subtitle_Codec_SelectedItem": "Burn"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-sub-copy",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Subtitle.Subtitle_Codec_SelectedItem": "Copy"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-sub-none",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Subtitle.Subtitle_Codec_SelectedItem": "None"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-sub-srt",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Subtitle.Subtitle_Codec_SelectedItem": "SRT"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-cut-yes",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Format.Format_Cut_SelectedItem": "Yes",
+      "Format.Format_CutStart_Hours_Text": "00",
+      "Format.Format_CutStart_Minutes_Text": "00",
+      "Format.Format_CutStart_Seconds_Text": "00",
+      "Format.Format_CutStart_Milliseconds_Text": "000",
+      "Format.Format_CutEnd_Hours_Text": "00",
+      "Format.Format_CutEnd_Minutes_Text": "00",
+      "Format.Format_CutEnd_Seconds_Text": "00",
+      "Format.Format_CutEnd_Milliseconds_Text": "000",
+      "Format.Format_FrameStart_Text": "1",
+      "Format.Format_FrameEnd_Text": "100",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-cut-no",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Format.Format_Cut_SelectedItem": "No",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-jpg-cut-yes",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frame.png",
+      "Format.Format_Container_SelectedItem": "jpg",
+      "Format.Format_Cut_SelectedItem": "Yes",
+      "Format.Format_CutStart_Hours_Text": "00",
+      "Format.Format_CutStart_Minutes_Text": "00",
+      "Format.Format_CutStart_Seconds_Text": "00",
+      "Format.Format_CutStart_Milliseconds_Text": "000",
+      "Format.Format_FrameStart_Text": "1",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "png", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1920x1080", "inputDuration": "0.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-jpg-cut-no",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\frame.png",
+      "Format.Format_Container_SelectedItem": "jpg",
+      "Format.Format_Cut_SelectedItem": "No",
+      "Format.Format_CutStart_Hours_Text": "00",
+      "Format.Format_CutStart_Minutes_Text": "00",
+      "Format.Format_CutStart_Seconds_Text": "00",
+      "Format.Format_CutStart_Milliseconds_Text": "000",
+      "Format.Format_FrameStart_Text": "1",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {"inputVideoCodec": "png", "inputAudioCodec": "", "inputVideoBitRate": "", "inputAudioBitRate": "", "inputSize": "1920x1080", "inputDuration": "0.0", "inputFrameRate": "25"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-x264-2pass",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "2 Pass",
+      "Video.Video_BitRate_Text": "6000",
+      "Video.Video_VBR_IsChecked": false
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-x264-crf-custom",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "CRF",
+      "Video.Video_CRF_Text": "18"
+    },
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-ffv1",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "FFV1", "Video.Video_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-huffyuv",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "HuffYUV", "Video.Video_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mkv-magicyuv",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "MagicYUV", "Video.Video_Quality_SelectedItem": "Lossless"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-h264-amf",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "H264 AMF", "Video.Video_Quality_SelectedItem": "High"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mp4-hevc-qsv",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "HEVC QSV", "Video.Video_Quality_SelectedItem": "High"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "5000000", "inputAudioBitRate": "192000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-ogv-vorbis",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mp4",
+      "Format.Format_Container_SelectedItem": "ogv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "Vorbis", "Audio.Audio_Quality_SelectedItem": "192"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "aac", "inputVideoBitRate": "2000000", "inputAudioBitRate": "128000", "inputSize": "1280x720", "inputDuration": "7.0", "inputFrameRate": "30"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-mpg-mp2",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.avi",
+      "Format.Format_Container_SelectedItem": "mpg",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Audio.Audio_Codec_SelectedItem": "MP2", "Audio.Audio_Quality_SelectedItem": "192"},
+    "ffprobe": {"inputVideoCodec": "mpeg4", "inputAudioCodec": "mp3", "inputVideoBitRate": "2000000", "inputAudioBitRate": "128000", "inputSize": "720x480", "inputDuration": "6.0", "inputFrameRate": "30"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ctl-webm-vp9",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "webm",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {"Video.Video_Codec_SelectedItem": "VP9", "Video.Video_Quality_SelectedItem": "Medium"},
+    "ffprobe": {"inputVideoCodec": "h264", "inputAudioCodec": "ac3", "inputVideoBitRate": "5000000", "inputAudioBitRate": "384000", "inputSize": "1920x1080", "inputDuration": "10.5", "inputFrameRate": "24"},
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  }
+]

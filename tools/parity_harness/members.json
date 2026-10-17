@@ -87,7 +87,10 @@
         "Video_Optimize_PreviousItem",
         "Video_Optimize_Profile_PreviousItem",
         "Video_Optimize_Tune_PreviousItem",
-        "Video_Quality_PreviousItem"
+        "Video_Quality_PreviousItem",
+        "Audio_Codec_PreviousItem",
+        "Video_Codec_PreviousItem",
+        "Video_Pass_PreviousItem"
       ]
     },
     {

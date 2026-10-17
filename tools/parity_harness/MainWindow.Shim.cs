@@ -2246,6 +2246,15 @@ namespace Axiom
         // >>> member: Video_Quality_PreviousItem
                 public static string Video_Quality_PreviousItem { get; set; }
 
+        // >>> member: Audio_Codec_PreviousItem
+                public static string Audio_Codec_PreviousItem { get; set; }
+
+        // >>> member: Video_Codec_PreviousItem
+                public static string Video_Codec_PreviousItem { get; set; }
+
+        // >>> member: Video_Pass_PreviousItem
+                public static string Video_Pass_PreviousItem { get; set; }
+
     }
 }
 

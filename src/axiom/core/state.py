@@ -11,6 +11,7 @@ consumes, so one fixture drives both sides.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Dict, Iterator, Mapping, MutableMapping
 
 from .defaults import DEFAULTS
@@ -73,7 +74,9 @@ class AxiomState:
     """Mutable state bag; unknown keys are accepted so ports can add fields freely."""
 
     def __init__(self, overrides: Mapping[str, Any] | None = None) -> None:
-        self.values: MutableMapping[str, Any] = dict(DEFAULTS)
+        # Collections in DEFAULTS are mutable; every state gets its own copy so a
+        # control-layer update cannot leak into the next conversion/preset.
+        self.values: MutableMapping[str, Any] = deepcopy(DEFAULTS)
         # Global control flags that the original kept as statics (e.g.
         # Controls.Video.Controls.passUserSelected).
         self.flags: MutableMapping[str, Any] = {}
@@ -147,6 +150,9 @@ class AxiomState:
         controls = case.get("controls") or {}
         if controls:
             state.set("_controls", dict(controls))
+        after_format = case.get("afterFormat") or {}
+        if after_format:
+            state.set("_after_format", dict(after_format))
         return state
 
     @property

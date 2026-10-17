@@ -9,7 +9,7 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 |---|---|---|
 | Oracle | `tools/parity_harness` builds a headless C# console app out of the *original* generator, control and codec sources (`build_harness.py`) and emits the exact Axiom command line for a case file | runs end to end; produced complete 2-pass commands with codec args, filters and stream maps |
 | Golden pipeline | `run_goldens.py` turns case files into `tests/golden/*.json`; `tests/test_parity.py` compares the Python output byte for byte | pipeline green (comparison skips until the generator lands) |
-| State model | `axiom/core/defaults.py` generated from the eight ViewModel classes (491 properties) plus `axiom/core/state.py` with the original names | `tests/test_state.py` |
+| State model | `axiom/core/defaults.py` generated from the eight ViewModel classes (508 properties/fields), including collection initialisers and `Load*Defaults`, plus `axiom/core/state.py` with the original names | `tests/test_state.py` |
 | String layer | `axiom/core/text.py`: `RemoveLineBreaks`, `ReplaceLineBreaksWithSpaces`, `WrapWithQuotes`, `IsValidPath`, `IsValidFilename`, `NormalizeValue` | `tests/test_text.py` |
 | Assembly | `axiom/core/assembly.py` reproduces "join with space, then delete line breaks" | `tests/test_assembly.py` |
 | Settings/presets | `axiom/core/config.py`: JSON schema v1, no legacy `axiom.conf`/`.ini` | `tests/test_config.py` |
@@ -18,34 +18,27 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 | CLI | `python -m axiom.cli --case <file> --id <id> --print resolved|command` - same case format as the oracle | exercised against the smoke cases |
 | Codec tables | `axiom/core/codecs_data.py`, generated from the 40 `Codecs/**` files (19 video, 12 audio, 6 subtitle, 3 image) incl. per-codec `qualityPass` tables | `tests/test_codecs.py` |
 | Codec runtime | `axiom/core/codecs.py`: lookups plus the `EncodingPass()` state machine (`apply_quality_pass`) | `tests/test_codecs.py` |
-| Control layer (codecs) | `axiom/core/controls.py` + `controls_data.py` (generated): codec string, item sources, pass state machine, `controls_Enabled`/`controls_Selected` overrides incl. previous-codec fallback | `tests/test_control_parity.py` against the oracle's resolved state |
-| State oracle | the harness now also dumps the resolved ViewModel state (432 keys, incl. public fields) next to the golden command | `tests/test_control_parity.py` |
-| Control layer (quality/optimize) | `QualityControls`, `VideoBitRateDisplay`, `OptimizeControls` ported; `controls_Checked`/`controls_Expanded` rules extracted and applied | `tests/test_control_parity.py` (37 keys) |
+| Control layer (complete) | `axiom/core/controls.py`: container defaults, `MediaTypeControls`/`MediaTypeControls_SelectedItems`, `CutControls`, `AudioStreamControls`, video/audio/subtitle codec controls, pixel format, encoding pass, quality/bitrate, optimize, previous-item fallback and filter enable/reset side effects | 60-case oracle matrix in `tests/test_control_parity.py`; every control-owned key matches |
+| State oracle | the harness dumps the full resolved ViewModel state next to the golden command; `control_cases.json` covers all containers, four media types, codec variants, quality/pass modes, cut and subtitle/audio branches | `tests/test_control_parity.py` (60 cases) |
 | Generator fixes | string item lists no longer coerced to numbers; ViewModel defaults now read from backing-field initialisers; property writes mirror the public backing field | regenerated `codecs_data.py` / `defaults.py` |
 | Containers | `containers_data.py` generated from `FormatContainers.cs` (15 containers, media/codec lists) and `FormatControls.cs` (per-container defaults); codec tables are now keyed by the **combo box labels** (`"MOV Text"`, `"H264 NVENC"`, `"MPEG-2"`) instead of C# class names | `tests/test_control_parity.py` |
 
 ## Next (in this order)
 
-1. **Remaining control modules**: `MediaTypeControls` /
-   `MediaTypeControls_SelectedItems` (media-type item lists and enable flags),
-   `PixelFormatControls`, `CutControls`, `AudioStreamControls` plus the audio side
-   (`AudioControls.CodecControls`/`QualityControls`/`AudioBitRateDisplay`).  Container
-   selection and the codec layer are in; every remaining key in the state dump is owned
-   by one of the modules above and can be added one at a time.
-2. ~~**Codec tables**~~ - done, see above.
-3. **Single-pass generator** (`_1_Pass` + `Generate.Video.*` + `Generate.Audio.*` +
+1. **Single-pass generator** (`_1_Pass` + `Generate.Video.*` + `Generate.Audio.*` +
    `Generate.Streams` + `Generate.Format`) until `tests/test_parity.py` passes for the
-   smoke cases.
-4. **2-pass / CRF / batch** assemblies.
-5. **Filters** (`Filters.Video`, `Filters.Audio`, 9-section selective colour).
-6. **Presets** - `Presets/Presets.cs` is 1642 plain `VM.*.* = value;` assignments, so a
+   60-case golden matrix.
+2. **2-pass / CRF / batch** assemblies.
+3. **Filters** (`Filters.Video`, `Filters.Audio`, 9-section selective colour) - the
+   control-layer enable/reset state is already ported; the command fragments remain.
+4. **Presets** - `Presets/Presets.cs` is 1642 plain `VM.*.* = value;` assignments, so a
    code generator (same approach as `gen_defaults.py`) turns it into a declarative table.
-7. **Path/output tokens** (`MainWindow.OutputPath`, `TokenAppender`, `TokenRemover`,
+5. **Path/output tokens** (`MainWindow.OutputPath`, `TokenAppender`, `TokenRemover`,
    `FileRenamer`) - already extracted verbatim into the harness shim, so both sides can
    be diffed directly.
-8. **UI** (M2): PySide6 main window with the six top-level tabs, script view, run/progress,
+6. **UI** (M2): PySide6 main window with the six top-level tabs, script view, run/progress,
    log window, batch, single Axiom Dark skin.
-9. **Packaging** (M3): PyInstaller onedir with bundled ffmpeg/ffprobe/ffplay.
+7. **Packaging** (M3): PyInstaller onedir with bundled ffmpeg/ffprobe/ffplay.
 
 ## Deliberate deviations from the original
 
@@ -68,4 +61,11 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 * `Program.ResolveControls()` replays the GUI's control-layer call order before
   generating, so goldens include the codec/quality tables - without it the generated
   commands are missing `-c:v`, quality and map arguments.
+* A case may carry an `afterFormat` section to simulate a user changing a codec, media
+  type or quality after the container was selected; Python applies it at the same point
+  in `controls.resolve()`.
+* `Program.Reset()` clears the previous-item statics and `passUserSelected` between
+  cases, so goldens do not depend on case order.
+* `build_harness.py` overwrites `gen_src/` in place instead of deleting it, because the
+  Windows sandbox may deny recursive deletes while allowing writes.
 

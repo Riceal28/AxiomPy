@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Web.Script.Serialization;
@@ -33,6 +34,9 @@ namespace Harness
                 { "FilterAudio", () => VM.FilterAudioView },
                 { "Configure", () => VM.ConfigureView },
             };
+
+        private static Dictionary<string, object> CurrentAfterFormat =
+            new Dictionary<string, object>();
 
         public static int Main(string[] args)
         {
@@ -70,6 +74,8 @@ namespace Harness
             try
             {
                 Reset();
+                CurrentAfterFormat = Section(item, "afterFormat")
+                    .ToDictionary(pair => pair.Key, pair => pair.Value);
                 foreach (var pair in Section(item, "state")) SetState(pair.Key, pair.Value);
                 foreach (var pair in Section(item, "ffprobe")) SetStatic(typeof(Analyze.FFprobe), pair.Key, pair.Value);
                 foreach (var pair in Section(item, "controls")) SetStatic(typeof(Controls.Configure), pair.Key, pair.Value);
@@ -205,6 +211,9 @@ namespace Harness
         private static void ResolveControls()
         {
             Controls.Format.Controls.FormatControls(VM.FormatView.Format_Container_SelectedItem);
+            // Fixture hook: simulate the user changing combo boxes after the container
+            // was picked (FormatControls would otherwise overwrite the codec defaults).
+            foreach (var pair in CurrentAfterFormat) SetState(pair.Key, pair.Value);
             Controls.Format.Controls.MediaTypeControls();
             Controls.Format.Controls.MediaTypeControls_SelectedItems();
             Controls.Format.Controls.CutControls();
@@ -289,9 +298,26 @@ namespace Harness
             MainWindow.outputExt = string.Empty;
             MainWindow.output = string.Empty;
             MainWindow.scriptText = null;
+            MainWindow.Format_Container_PreviousItem = null;
+            MainWindow.Video_Codec_PreviousItem = null;
             MainWindow.Video_EncodeSpeed_PreviousItem = null;
+            MainWindow.Video_Quality_PreviousItem = null;
+            MainWindow.Video_Pass_PreviousItem = null;
+            MainWindow.Video_Optimize_PreviousItem = null;
+            MainWindow.Video_Optimize_Tune_PreviousItem = null;
+            MainWindow.Video_Optimize_Profile_PreviousItem = null;
+            MainWindow.Video_Optimize_Level_PreviousItem = null;
+            MainWindow.Audio_Codec_PreviousItem = null;
+            MainWindow.Audio_Stream_PreviousItem = null;
+            MainWindow.Audio_Channel_PreviousItem = null;
+            MainWindow.Audio_Quality_PreviousItem = null;
+            MainWindow.Audio_CompressionLevel_PreviousItem = null;
+            MainWindow.Audio_SampleRate_PreviousItem = null;
+            MainWindow.Audio_BitDepth_PreviousItem = null;
+            MainWindow.Audio_VBR_PreviousChecked = null;
             Dialog.Messages = new List<string>();
             Controls.ScriptView.sort = false;
+            Controls.Video.Controls.passUserSelected = false;
             Controls.Configure.threads = string.Empty;
         }
 

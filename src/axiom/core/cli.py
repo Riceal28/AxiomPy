@@ -35,7 +35,10 @@ def select_cases(cases: Iterable[Mapping[str, Any]], case_id: str | None) -> lis
 
 
 def describe(case: Mapping[str, Any]) -> dict[str, Any]:
+    from .generate import resolve_controls
+
     state = AxiomState.from_case(case)
+    resolve_controls(state)
     return {
         "id": case.get("id"),
         "state": state.to_overrides(),
