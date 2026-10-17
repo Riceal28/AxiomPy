@@ -17,6 +17,7 @@ from typing import Any, Dict, Mapping, Sequence
 
 from . import codecs
 from .controls_data import CONTROLS
+from .containers_data import CONTAINERS, FORMAT_CONTROLS
 from .state import AxiomState
 
 KIND_GROUP = {"video": "Video", "audio": "Audio", "subtitle": "Subtitle"}
@@ -165,6 +166,7 @@ def resolve(state: AxiomState) -> AxiomState:
     media-type dependent enable flags) are the next module to land; until then this
     resolves the codec layer only.
     """
+    format_controls(state, state.get("Format.Format_Container_SelectedItem") or "")
     for kind, group in KIND_GROUP.items():
         name = state.get(f"{group}.{group}_Codec_SelectedItem")
         if name:
@@ -174,6 +176,23 @@ def resolve(state: AxiomState) -> AxiomState:
         video_quality_controls(state)
         video_bitrate_display(state)
     return state
+
+
+def format_controls(state: AxiomState, container: str) -> Dict[str, Any]:
+    """Port of Controls.Format.Controls.FormatControls (container -> item lists + defaults)."""
+    if not container:
+        return {}
+    spec = FORMAT_CONTROLS.get(container) or {}
+    applied: Dict[str, Any] = {}
+    for field, action in spec.items():
+        if action[0] == "list":
+            values = list(CONTAINERS.get(action[1], {}).get(action[2], []))
+            state.set(field, values)
+            applied[field] = values
+        else:
+            state.set(field, action[1])
+            applied[field] = action[1]
+    return applied
 
 
 # --------------------------------------------------------------------------------------

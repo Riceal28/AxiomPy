@@ -22,16 +22,16 @@ Snapshot of the Axiom -> Python rewrite.  The original WPF sources in
 | State oracle | the harness now also dumps the resolved ViewModel state (432 keys, incl. public fields) next to the golden command | `tests/test_control_parity.py` |
 | Control layer (quality/optimize) | `QualityControls`, `VideoBitRateDisplay`, `OptimizeControls` ported; `controls_Checked`/`controls_Expanded` rules extracted and applied | `tests/test_control_parity.py` (37 keys) |
 | Generator fixes | string item lists no longer coerced to numbers; ViewModel defaults now read from backing-field initialisers; property writes mirror the public backing field | regenerated `codecs_data.py` / `defaults.py` |
+| Containers | `containers_data.py` generated from `FormatContainers.cs` (15 containers, media/codec lists) and `FormatControls.cs` (per-container defaults); codec tables are now keyed by the **combo box labels** (`"MOV Text"`, `"H264 NVENC"`, `"MPEG-2"`) instead of C# class names | `tests/test_control_parity.py` |
 
 ## Next (in this order)
 
-1. **Remaining control modules**: `FormatControls` / `MediaTypeControls` /
-   `MediaTypeControls_SelectedItems` (container driven item lists, the per-container
-   `Video_Optimize_SelectedItem` default and the media-type enable flags),
+1. **Remaining control modules**: `MediaTypeControls` /
+   `MediaTypeControls_SelectedItems` (media-type item lists and enable flags),
    `PixelFormatControls`, `CutControls`, `AudioStreamControls` plus the audio side
-   (`AudioControls.CodecControls`/`QualityControls`/`AudioBitRateDisplay`).  Every
-   remaining key in the state dump is owned by one of these, so they can be added one at
-   a time and verified the same way.
+   (`AudioControls.CodecControls`/`QualityControls`/`AudioBitRateDisplay`).  Container
+   selection and the codec layer are in; every remaining key in the state dump is owned
+   by one of the modules above and can be added one at a time.
 2. ~~**Codec tables**~~ - done, see above.
 3. **Single-pass generator** (`_1_Pass` + `Generate.Video.*` + `Generate.Audio.*` +
    `Generate.Streams` + `Generate.Format`) until `tests/test_parity.py` passes for the
