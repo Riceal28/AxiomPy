@@ -20,6 +20,18 @@ if ffmpeg_bin is None:
 missing = [name for name in ("ffmpeg.exe", "ffprobe.exe", "ffplay.exe") if not (ffmpeg_bin / name).is_file()]
 if missing:
     raise SystemExit(f"Missing bundled tools in {ffmpeg_bin}: {', '.join(missing)}")
+shims = [
+    name
+    for name in ("ffmpeg.exe", "ffprobe.exe", "ffplay.exe")
+    if (ffmpeg_bin / (name + ".shim")).exists()
+    or (ffmpeg_bin / name).stat().st_size < 1024 * 1024
+]
+if shims:
+    raise SystemExit(
+        "Refusing to bundle package-manager shims: "
+        + ", ".join(shims)
+        + f". Set AXIOM_FFMPEG_BIN to the real binaries in {ffmpeg_bin}."
+    )
 
 a = Analysis(
     [str(project / "packaging" / "entrypoint.py")],

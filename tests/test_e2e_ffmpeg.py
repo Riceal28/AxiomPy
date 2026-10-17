@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -164,3 +165,101 @@ def test_external_audio_metadata_reaches_output(tmp_path, monkeypatch):
     tags = json.loads(probe.stdout)["streams"][0]["tags"]
     assert tags["title"] == "Commentary"
     assert tags["language"] == "en"
+
+
+@lru_cache(maxsize=1)
+def _nvenc_available() -> bool:
+    result = subprocess.run(
+        [
+            str(FFMPEG_BIN / "ffmpeg.exe"),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=black:s=320x240:d=0.1",
+            "-c:v",
+            "h264_nvenc",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def _hardware_state(source: Path, codec: str, vendor: str) -> AxiomState:
+    state = AxiomState(
+        {
+            "Main.Input_Text": str(source),
+            "Format.Format_Container_SelectedItem": "mp4",
+            "Format.Format_MediaType_SelectedItem": "Video",
+            "Configure.Shell_SelectedItem": "CMD",
+        }
+    )
+    resolve_controls(state)
+    state.set("Video.Video_HWAccel_SelectedItem", "On")
+    controls.hwaccel_mode_controls(state)
+    state.set("Video.Video_HWAccel_Transcode_SelectedItem", vendor)
+    controls.select_hwaccel_video_codec(state)
+    state.set("Video.Video_Codec_SelectedItem", codec)
+    controls.change_hwaccel_transcode(state)
+    controls.codec_controls(state, "video", codec)
+    controls.encoding_pass_controls(state)
+    state.set("Video.Video_Quality_SelectedItem", "High")
+    state.set("Video.Video_Pass_SelectedItem", "CRF")
+    controls.video_quality_controls(state)
+    controls.video_bitrate_display(state)
+    return state
+
+
+@pytest.mark.parametrize(
+    ("codec", "expected"),
+    (("H264 NVENC", "h264"), ("HEVC NVENC", "hevc")),
+)
+def test_nvenc_generated_command_encodes_real_output(
+    tmp_path,
+    monkeypatch,
+    codec,
+    expected,
+):
+    if not _nvenc_available():
+        pytest.skip("NVIDIA NVENC is unavailable")
+    monkeypatch.setenv(
+        "PATH",
+        str(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    source = tmp_path / "clip.mkv"
+    _make_source(source)
+    state = _hardware_state(source, codec, "NVIDIA NVENC")
+
+    log: list[str] = []
+    assert run(
+        generate_runnable(state),
+        RunOptions(shell="CMD"),
+        on_log=log.append,
+    ) == 0, "\n".join(log[-20:])
+
+    output = tmp_path / "clip.mp4"
+    assert output.is_file()
+    probe = subprocess.run(
+        [
+            str(FFMPEG_BIN / "ffprobe.exe"),
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert probe.stdout.strip() == expected

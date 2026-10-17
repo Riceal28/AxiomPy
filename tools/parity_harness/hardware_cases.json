@@ -88,6 +88,7 @@
       "Video.Video_Codec_SelectedItem": "H264 AMF",
       "Video.Video_Quality_SelectedItem": "High"
     },
+    "expectedOverride": "amf-qvbr",
     "ffprobe": {
       "inputVideoCodec": "h264",
       "inputAudioCodec": "aac",

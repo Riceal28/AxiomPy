@@ -26,6 +26,9 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 - 内置预设、ffprobe 分析、预览、输入/输出拖放以及 PyInstaller 便携版构建。
 - 默认采用 1280x720 布局，支持 8–16 pt 界面字体缩放，并可在退出时选择是否恢复
   完整工作区。
+- 选择预设后，预设固定的参数会灰显，鼠标悬停可查看原因；点击 **Unlock**
+  可保留当前值并解锁编辑。
+- 鼠标滚轮调参作为可选项提供，默认关闭，避免误改参数。
 
 ## 系统要求
 
@@ -51,6 +54,11 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 
 便携版已经包含 FFmpeg、FFprobe 和 FFplay。若 `AxiomPy.exe` 同级目录存在 `config`
 目录，设置和预设会保存在该目录中。
+
+请保持解压后的目录完整：内置工具位于 `_internal` 子目录中。单独移动
+`AxiomPy.exe` 会导致找不到 FFmpeg。如果出现
+`..\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe` 之类的缺失文件提示，说明运行的是
+误将包管理器 shim 打入压缩包的旧版本，请下载 0.2.1 或更新的 Release。
 
 ### 从源码运行
 
@@ -88,6 +96,10 @@ axiom-cli --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --pri
 Input/Output 是独立面板。Script 与 Log 停靠窗口可调整大小，其布局也会被工作区快照
 保存。
 
+首次启动默认使用 **MP4** 容器，并选择 **all**（全部）音频流。选择预设后，预设
+固定的容器、编解码器、质量、流选择和硬件路径会锁定；锁定控件会灰显并在悬停时
+说明原因。点击 **Unlock** 可保留当前值并编辑，或选择 `Preset` 回到手动默认值。
+
 ### 硬件加速
 
 将 **Video → Encoding → Hardware Acceleration** 设置为 `On` 后，可选择硬件编码器。
@@ -99,6 +111,10 @@ Input/Output 是独立面板。Script 与 Log 停靠窗口可调整大小，其�
 硬件质量参数沿用原版 Axiom 的参数表。编码器能否实际使用取决于 GPU 驱动和 FFmpeg
 构建；仅检测到编码器并不保证驱动会话一定能够成功创建。
 
+NVENC 使用 `-rc:v vbr_hq` 与 CRF/CQ，QSV 使用 `-global_quality` 和 look-ahead；
+AMF 使用原生的 `-rc qvbr -qvbr_quality_level` 选项。H.264 与 HEVC NVENC 命令已由
+可选的真实硬件编码测试覆盖。
+
 ### 工作区与界面设置
 
 打开 **Settings → System** 可配置：
@@ -106,6 +122,8 @@ Input/Output 是独立面板。Script 与 Log 停靠窗口可调整大小，其�
 - **Font Size**：8–16 pt，立即应用到整个程序和样式表。
 - **Save workspace on exit**：启用后，下次启动会恢复窗口位置与尺寸、停靠布局、
   当前 Tab、编辑后的脚本和转换参数。
+- **Mouse wheel adjusts values**：默认关闭；启用后才允许鼠标滚轮直接修改下拉框
+  和数值框。
 
 默认窗口大小为 1280x720；如果存在已保存的工作区，则优先使用工作区中的尺寸。
 
@@ -136,7 +154,10 @@ $env:AXIOM_FFMPEG_BIN = "C:\ffmpeg\bin"
 ```
 
 `build.ps1` 也接受 `-FfmpegBin` 和 `-Python`。未设置 `AXIOM_FFMPEG_BIN` 时，脚本会
-尝试从 `PATH` 中查找 `ffmpeg.exe`。输出目录为 `dist\AxiomPy`。
+尝试从 `PATH` 中查找 `ffmpeg.exe`。脚本会拒绝打包体积很小的包管理器 shim 或带有
+`.shim` 伴随文件的启动器，因为这类文件不包含 FFmpeg，移动目录后必然失效。
+输出目录为 `dist\AxiomPy`；`verify.ps1` 会在发布前用 `-version` 启动三个内置工具
+进行验证。
 
 ## 开发
 
@@ -148,8 +169,8 @@ pytest -q
 
 当前开发环境的验证结果：
 
-- `342 passed, 2 skipped`
-- 可选的 FFmpeg 真实转换测试：`2 passed`
+- `347 passed, 4 skipped`
+- 可选的 FFmpeg 真实转换测试：`4 passed`，包含 H.264 与 HEVC NVENC
 - 13 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`
 
 ### 一致性测试工具

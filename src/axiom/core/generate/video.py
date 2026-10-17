@@ -94,15 +94,22 @@ def hardware_quality_override(
     quality: str,
     crf_text: str,
 ) -> str | None:
-    """Return the original NVENC/QSV CRF arguments, or ``None`` if not intercepted."""
+    """Return hardware-specific quality arguments, or ``None`` if not intercepted.
+
+    NVENC and QSV reproduce the original Axiom arguments.  AMF uses its native
+    QVBR options because the generic ``-crf`` flag is not an AMF encoder option
+    and therefore did not actually select the requested quality.
+    """
     if str(state.get("Video.Video_HWAccel_SelectedItem") or "").casefold() != "on":
         return None
     transcode = str(
         state.get("Video.Video_HWAccel_Transcode_SelectedItem") or ""
     )
-    if transcode in ("", "off", "auto", "AMD AMF"):
+    if transcode in ("", "off", "auto"):
         return None
     if codec not in (
+        "H264 AMF",
+        "HEVC AMF",
         "H264 NVENC",
         "HEVC NVENC",
         "H264 QSV",
@@ -113,6 +120,13 @@ def hardware_quality_override(
         return None
 
     row = _row("video", codec, "quality", quality)
+    if transcode == "AMD AMF":
+        value = str(row.get("CRF") or crf_text)
+        return (
+            f"-rc qvbr -qvbr_quality_level {value}"
+            if value
+            else ""
+        )
     if transcode == "NVIDIA NVENC":
         if codec == "H264 NVENC":
             value = str(row.get("CRF") or crf_text)

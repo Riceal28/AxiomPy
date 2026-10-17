@@ -19,8 +19,17 @@ $found = Get-ChildItem -LiteralPath $Package -Recurse -File |
     Select-Object -ExpandProperty FullName
 
 foreach ($name in $tools) {
-    if (-not ($found | Where-Object { (Split-Path -Leaf $_) -eq $name })) {
+    $tool = $found | Where-Object { (Split-Path -Leaf $_) -eq $name } |
+        Select-Object -First 1
+    if (-not $tool) {
         throw "Bundled tool missing: $name"
+    }
+    if ((Get-Item -LiteralPath $tool).Length -lt 1MB) {
+        throw "Bundled tool is a shim, not a real executable: $tool"
+    }
+    & $tool -version *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Bundled tool failed to start: $tool (exit $LASTEXITCODE)"
     }
 }
 

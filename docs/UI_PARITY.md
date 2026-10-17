@@ -36,6 +36,10 @@ debug console, crop window, file-properties window and legacy theme/config forma
 * Preview launches ffplay asynchronously and refuses batch mode, matching the original
   guard.
 * Input and output boxes accept Explorer drag/drop.
+* Selecting a preset disables the preset-owned profile controls, explains the lock on
+  hover, and offers an Unlock action that keeps the current values editable.
+* Mouse-wheel changes on combo boxes and spin boxes are blocked by default; the
+  behavior is opt-in from Settings → System.
 
 ## Intentional visual differences
 

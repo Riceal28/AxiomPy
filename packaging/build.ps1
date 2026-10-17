@@ -18,8 +18,17 @@ if (-not $FfmpegBin) {
 }
 $FfmpegBin = (Resolve-Path -LiteralPath $FfmpegBin).Path
 foreach ($name in @("ffmpeg.exe", "ffprobe.exe", "ffplay.exe")) {
-    if (-not (Test-Path -LiteralPath (Join-Path $FfmpegBin $name))) {
-        throw "Missing bundled tool: $(Join-Path $FfmpegBin $name)"
+    $tool = Join-Path $FfmpegBin $name
+    if (-not (Test-Path -LiteralPath $tool)) {
+        throw "Missing bundled tool: $tool"
+    }
+    if ((Get-Item -LiteralPath $tool).Length -lt 1MB) {
+        throw ("Refusing to bundle a package-manager shim as $name. " +
+               "Pass -FfmpegBin with the directory containing the real FFmpeg binaries.")
+    }
+    if (Test-Path -LiteralPath ($tool + ".shim")) {
+        throw ("Refusing to bundle a Chocolatey shim as $name. " +
+               "Pass -FfmpegBin with the real FFmpeg bin directory.")
     }
 }
 

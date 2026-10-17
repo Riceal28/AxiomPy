@@ -48,7 +48,41 @@ jobs:
             choco install ffmpeg -y --no-progress
             $ffmpeg = Get-Command ffmpeg.exe -ErrorAction Stop
           }
-          $bin = Split-Path -Parent $ffmpeg.Source
+
+          # Chocolatey puts a small shim on PATH.  PyInstaller must bundle the
+          # real binaries from the package's tools directory; copying a shim
+          # produces the "..\lib\ffmpeg\tools\..." missing-file error at runtime.
+          $candidates = @()
+          $roots = @()
+          if ($env:ProgramData) {
+            $roots += Join-Path $env:ProgramData "chocolatey\lib"
+          }
+          if ($env:ChocolateyInstall) {
+            $roots += Join-Path $env:ChocolateyInstall "lib"
+          }
+          $roots = $roots | Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -Unique
+          if ($roots) {
+            $candidates += Get-ChildItem -Path $roots -Recurse -Filter ffmpeg.exe `
+              -ErrorAction SilentlyContinue |
+              Where-Object { $_.Length -ge 1MB -and -not (Test-Path ($_.FullName + ".shim")) }
+          }
+          if ($ffmpeg) {
+            $path_candidate = Get-Item -LiteralPath $ffmpeg.Source -ErrorAction SilentlyContinue
+            if ($path_candidate -and $path_candidate.Length -ge 1MB) {
+              $candidates += $path_candidate
+            }
+          }
+          $real = $candidates | Select-Object -First 1
+          if (-not $real) {
+            throw "Could not locate real FFmpeg binaries (only shims were found)."
+          }
+          $bin = Split-Path -Parent $real.FullName
+          foreach ($name in @("ffmpeg.exe", "ffprobe.exe", "ffplay.exe")) {
+            if (-not (Test-Path -LiteralPath (Join-Path $bin $name))) {
+              throw "Missing $name next to $($real.FullName)"
+            }
+          }
           "AXIOM_FFMPEG_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build portable package

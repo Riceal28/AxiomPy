@@ -7,9 +7,10 @@ import re
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, Qt, QThread, Signal
+from PySide6.QtCore import QByteArray, QEvent, QObject, Qt, QThread, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QColor, QGuiApplication
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QAbstractItemView,
     QApplication,
     QCheckBox,
@@ -58,6 +59,7 @@ from axiom.core.script import Script
 from axiom.core.state import AxiomState
 
 from .control_rules import enabled_key, structural_scope
+from .preset_locks import PRESET_LOCKED_KEYS, preset_lock_reason
 
 
 SELECTIVE_COLORS = (
@@ -77,6 +79,7 @@ DEFAULT_FONT_SIZE = 9
 FONT_SIZE_OPTIONS = tuple(range(8, 17))
 FONT_SIZE_KEY = "Ui.FontSize"
 SAVE_WORKSPACE_KEY = "Ui.SaveWorkspaceOnExit"
+MOUSE_WHEEL_KEY = "Ui.MouseWheelAdjust"
 WORKSPACE_KEY = "Ui.Workspace"
 WORKSPACE_SCHEMA = 1
 
@@ -97,6 +100,7 @@ SETTINGS_KEYS = (
     "Main.CMDWindowKeep_IsChecked",
     "Main.ExternalConsole_IsChecked",
     "Main.AutoSortScript_IsChecked",
+    MOUSE_WHEEL_KEY,
 )
 
 
@@ -162,6 +166,23 @@ class _RunWorker(QThread):
         self.done.emit(code, self.cancel.is_set())
 
 
+class _WheelGuard(QObject):
+    """Block wheel events on value controls unless the user opted in."""
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self.enabled = False
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
+        if (
+            not self.enabled
+            and event.type() == QEvent.Wheel
+            and isinstance(obj, (QComboBox, QAbstractSpinBox))
+        ):
+            return True
+        return False
+
+
 class MainWindow(QMainWindow):
     """Operational shell around the parity-tested core engine."""
 
@@ -185,11 +206,19 @@ class MainWindow(QMainWindow):
         self._batch_current_row = -1
         self._font_size = DEFAULT_FONT_SIZE
         self._save_workspace_on_exit = True
+        self._mouse_wheel_adjust = False
+        self._preset_locked = False
         self._settings_path: Path | None = None
         self._persist_on_close = False
+        self._wheel_guard = _WheelGuard(self)
+        self._base_tooltips: dict[str, str] = {}
 
         self.setWindowTitle("AxiomPy")
         self.resize(1280, 720)
+        # New installations open on MP4, the most common share/encode container.
+        # The core DEFAULTS table keeps the original webm values for parity tests.
+        self.state.set("Format.Format_Container_SelectedItem", "mp4")
+        self.state.set("Format.Format_Container_SelectedIndex", 2)
         self._build_ui()
         self._load_presets()
         self._refresh_controls(full=True)
@@ -214,6 +243,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         self._build_docks()
         self._build_status()
+        self._install_wheel_guard()
+        self._base_tooltips = {
+            key: widget.toolTip() for key, widget in self.widgets.items()
+        }
 
         refresh = QAction("Regenerate Script", self)
         refresh.setShortcut("F5")
@@ -235,9 +268,23 @@ class MainWindow(QMainWindow):
 
         self.preset_combo = QComboBox(self)
         self.preset_combo.setMinimumWidth(190)
+        self.preset_combo.setToolTip(
+            "Choose a built-in or user preset. Preset-owned values are locked "
+            "until you click Unlock or select 'Preset'."
+        )
         self.preset_combo.currentTextChanged.connect(self._on_preset)
+        self.preset_unlock_button = QPushButton("Unlock", self)
+        self.preset_unlock_button.setToolTip(
+            "Allow editing values supplied by the selected preset."
+        )
+        self.preset_unlock_button.clicked.connect(self._unlock_preset_values)
+        self.preset_unlock_button.hide()
+        preset_row = QHBoxLayout()
+        preset_row.setContentsMargins(0, 0, 0, 0)
+        preset_row.addWidget(self.preset_combo, 1)
+        preset_row.addWidget(self.preset_unlock_button)
         grid.addWidget(QLabel("Preset", self), 0, 0)
-        grid.addWidget(self.preset_combo, 0, 1)
+        grid.addLayout(preset_row, 0, 1)
 
         self.input_edit = PathDropEdit(self)
         self.input_edit.setPlaceholderText("Input file or batch directory")
@@ -408,6 +455,14 @@ class MainWindow(QMainWindow):
         self.preview_button = QPushButton("Preview", self)
         self.preview_button.clicked.connect(self._preview)
         status.addPermanentWidget(self.preview_button)
+
+    def _install_wheel_guard(self) -> None:
+        """Install the opt-in wheel filter on every value-editing control."""
+
+        candidates = [self.font_size_combo, *self.widgets.values()]
+        for widget in candidates:
+            if isinstance(widget, (QComboBox, QAbstractSpinBox)):
+                widget.installEventFilter(self._wheel_guard)
 
     def _page(self) -> tuple[QWidget, QFormLayout]:
         page = QWidget(self)
@@ -1096,6 +1151,18 @@ class MainWindow(QMainWindow):
         self.save_workspace_check.setChecked(self._save_workspace_on_exit)
         self.save_workspace_check.toggled.connect(self._on_save_workspace)
         interface_form.addRow(self.save_workspace_check)
+        self.wheel_adjust_check = QCheckBox(
+            "Mouse wheel adjusts values", self
+        )
+        self.wheel_adjust_check.setToolTip(
+            "Allow the mouse wheel to change combo boxes and spin boxes. "
+            "Disabled by default to prevent accidental parameter changes."
+        )
+        self.wheel_adjust_check.setChecked(self._mouse_wheel_adjust)
+        self.wheel_adjust_check.toggled.connect(
+            self._on_mouse_wheel_adjust
+        )
+        interface_form.addRow(self.wheel_adjust_check)
         form.addRow(interface)
 
         save_preset = QPushButton("Save User Preset…", self)
@@ -1183,6 +1250,11 @@ class MainWindow(QMainWindow):
             widget.addItem(item)
 
     def _sync_widget_states(self) -> None:
+        # Preset locking disables widgets outside the normal ViewModel flags.
+        # Re-enable first so every call starts from a clean baseline, then the
+        # rules below (and the preset overlay) decide the final state.
+        for widget in self.widgets.values():
+            widget.setEnabled(True)
         auto_sort = bool(self.state.get("Main.AutoSortScript_IsChecked"))
         if self.auto_sort_check.isChecked() != auto_sort:
             self.auto_sort_check.blockSignals(True)
@@ -1252,6 +1324,26 @@ class MainWindow(QMainWindow):
         self.clear_crop_button.setEnabled(
             bool(self.state.get("Video.Video_Crop_IsEnabled"))
         )
+        self._apply_preset_locks()
+
+    def _apply_preset_locks(self) -> None:
+        """Gray preset-owned controls and explain them on hover."""
+
+        preset_name = str(self.state.get("Main.Preset_SelectedItem") or "Preset")
+        locked = (
+            self._preset_locked
+            and preset_name not in ("", "Preset")
+        )
+        self.preset_unlock_button.setVisible(locked)
+        for key, widget in self.widgets.items():
+            base = self._base_tooltips.get(key, "")
+            if locked and key in PRESET_LOCKED_KEYS:
+                widget.setEnabled(False)
+                widget.setToolTip(preset_lock_reason(key, preset_name))
+                widget.setProperty("presetLocked", True)
+            elif widget.property("presetLocked"):
+                widget.setToolTip(base)
+                widget.setProperty("presetLocked", False)
 
     def _list_paths(self, widget: QListWidget) -> list[str]:
         return [
@@ -1320,9 +1412,28 @@ class MainWindow(QMainWindow):
             self.state.set("Main.Preset_SelectedItem", name)
         except KeyError:
             return
+        self._preset_locked = name not in ("", "Preset")
         self._refresh_controls(full=True)
         self._populate_widgets()
         self._regenerate(force=True)
+        if self._preset_locked:
+            self.status_label.setText(
+                f"Preset '{name}' applied. Grayed values are fixed by the "
+                "preset; click Unlock to edit them."
+            )
+        else:
+            self.status_label.setText("Preset defaults applied")
+
+    def _unlock_preset_values(self) -> None:
+        """Keep the current preset values but allow the user to edit them."""
+
+        self._preset_locked = False
+        self.preset_unlock_button.hide()
+        self._sync_widget_states()
+        self._regenerate()
+        self.status_label.setText(
+            "Preset values unlocked; edits do not modify the preset file."
+        )
 
     def _on_tokens(self, *_args) -> None:
         if self._loading:
@@ -1915,6 +2026,17 @@ class MainWindow(QMainWindow):
         if not self._loading:
             self._save_workspace_on_exit = checked
 
+    def _on_mouse_wheel_adjust(self, checked: bool) -> None:
+        if self._loading:
+            return
+        self._mouse_wheel_adjust = checked
+        self._wheel_guard.enabled = checked
+        self.status_label.setText(
+            "Mouse-wheel value adjustment enabled"
+            if checked
+            else "Mouse-wheel value adjustment disabled"
+        )
+
     def _workspace_payload(self) -> dict:
         return {
             "schema": WORKSPACE_SCHEMA,
@@ -1959,6 +2081,8 @@ class MainWindow(QMainWindow):
         self.preset_combo.blockSignals(True)
         self.preset_combo.setCurrentText(preset)
         self.preset_combo.blockSignals(False)
+        self._preset_locked = preset not in ("", "Preset")
+        self._sync_widget_states()
 
         tabs = payload.get("tabs")
         if isinstance(tabs, dict):
@@ -1995,6 +2119,7 @@ class MainWindow(QMainWindow):
         values = {key: self.state.get(key) for key in SETTINGS_KEYS}
         values[FONT_SIZE_KEY] = self._font_size
         values[SAVE_WORKSPACE_KEY] = bool(self._save_workspace_on_exit)
+        values[MOUSE_WHEEL_KEY] = bool(self._mouse_wheel_adjust)
         if self._save_workspace_on_exit:
             values[WORKSPACE_KEY] = self._workspace_payload()
         return values
@@ -2025,6 +2150,13 @@ class MainWindow(QMainWindow):
         except (TypeError, ValueError):
             font_size = DEFAULT_FONT_SIZE
         self._apply_font_size(font_size)
+        self._mouse_wheel_adjust = bool(
+            settings.get(MOUSE_WHEEL_KEY, False)
+        )
+        self._wheel_guard.enabled = self._mouse_wheel_adjust
+        self.wheel_adjust_check.blockSignals(True)
+        self.wheel_adjust_check.setChecked(self._mouse_wheel_adjust)
+        self.wheel_adjust_check.blockSignals(False)
         self._save_workspace_on_exit = bool(
             settings.get(SAVE_WORKSPACE_KEY, True)
         )

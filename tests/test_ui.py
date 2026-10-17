@@ -2,6 +2,8 @@
 
 import threading
 
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication
 
 from axiom.core.config import Settings
@@ -30,6 +32,10 @@ def test_default_window_is_720p_with_separate_file_panel(qtbot):
     assert (window.width(), window.height()) == (1280, 720)
     assert window.path_panel.title() == "Input / Output"
     assert window.path_panel.objectName() == "pathPanel"
+    assert (
+        window.widgets["Format.Format_Container_SelectedItem"].currentText()
+        == "mp4"
+    )
 
 
 def test_font_size_applies_immediately(qtbot):
@@ -60,6 +66,65 @@ def test_preset_updates_container_and_codec(qtbot):
     assert window.widgets["Format.Format_Container_SelectedItem"].currentText() == "webm"
     assert window.widgets["Video.Video_Codec_SelectedItem"].currentText() == "VP8"
     assert "-c:v libvpx" in window._generated_text
+
+
+def test_preset_locks_identity_controls_with_hover_reason(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.preset_combo.setCurrentText("HD High")
+
+    container = window.widgets["Format.Format_Container_SelectedItem"]
+    codec = window.widgets["Video.Video_Codec_SelectedItem"]
+    hardware = window.widgets["Video.Video_HWAccel_SelectedItem"]
+    for widget in (container, codec, hardware):
+        assert not widget.isEnabled()
+        assert "HD High" in widget.toolTip()
+        assert "Unlock" in widget.toolTip()
+
+    window.preset_unlock_button.click()
+    assert container.isEnabled()
+    assert codec.isEnabled()
+    assert window.preset_unlock_button.isHidden()
+
+    window.preset_combo.setCurrentText("Preset")
+    assert container.isEnabled()
+
+
+def _wheel_event() -> QWheelEvent:
+    return QWheelEvent(
+        QPointF(10, 10),
+        QPointF(10, 10),
+        QPoint(0, 0),
+        QPoint(0, 120),
+        Qt.NoButton,
+        Qt.NoModifier,
+        Qt.NoScrollPhase,
+        False,
+    )
+
+
+def test_mouse_wheel_adjustment_is_opt_in_and_persisted(qtbot, tmp_path):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    combo = window.widgets["Video.Video_Quality_SelectedItem"]
+
+    assert window.wheel_adjust_check.isChecked() is False
+    combo.setCurrentIndex(2)
+    before = combo.currentIndex()
+    QApplication.sendEvent(combo, _wheel_event())
+    assert combo.currentIndex() == before
+
+    window.wheel_adjust_check.setChecked(True)
+    QApplication.sendEvent(combo, _wheel_event())
+    assert combo.currentIndex() != before
+
+    path = tmp_path / "axiom.json"
+    window._save_settings(path)
+    restored = MainWindow()
+    qtbot.addWidget(restored)
+    restored._load_settings(path)
+    assert restored.wheel_adjust_check.isChecked() is True
+    assert restored._wheel_guard.enabled is True
 
 
 def test_scale_controls_follow_custom_and_source(qtbot):

@@ -1,6 +1,7 @@
 """Hardware-acceleration control linkage."""
 
 from axiom.core import controls
+from axiom.core.generate import generate
 from axiom.core.presets_data import BUILTIN_PRESETS
 from axiom.core.state import AxiomState
 
@@ -73,3 +74,34 @@ def test_video_presets_do_not_enable_hardware_implicitly():
         if codec in (None, "None", "Copy"):
             continue
         assert preset.get("Video.Video_HWAccel_SelectedItem") == "Off", name
+
+
+def _hardware_command(codec: str, vendor: str) -> str:
+    state = _mp4_state()
+    controls.resolve(state)
+    state.set("Video.Video_HWAccel_SelectedItem", "On")
+    controls.hwaccel_mode_controls(state)
+    state.set("Video.Video_HWAccel_Transcode_SelectedItem", vendor)
+    controls.select_hwaccel_video_codec(state)
+    state.set("Video.Video_Codec_SelectedItem", codec)
+    controls.change_hwaccel_transcode(state)
+    controls.codec_controls(state, "video", codec)
+    controls.encoding_pass_controls(state)
+    state.set("Video.Video_Quality_SelectedItem", "High")
+    state.set("Video.Video_Pass_SelectedItem", "CRF")
+    controls.video_quality_controls(state)
+    controls.video_bitrate_display(state)
+    return generate(state)
+
+
+def test_amf_uses_native_qvbr_quality_options():
+    command = _hardware_command("H264 AMF", "AMD AMF")
+    assert "-c:v h264_amf" in command
+    assert "-rc qvbr -qvbr_quality_level 20" in command
+    assert "-crf " not in command
+
+
+def test_nvenc_uses_original_quality_arguments():
+    command = _hardware_command("H264 NVENC", "NVIDIA NVENC")
+    assert "-c:v h264_nvenc" in command
+    assert "-rc:v vbr_hq -crf 20" in command

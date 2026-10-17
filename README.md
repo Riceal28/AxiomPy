@@ -30,6 +30,10 @@ option as raw text.
   PyInstaller build.
 - 1280x720 default layout, adjustable 8–16 pt interface font and optional restoration
   of the complete workspace on exit.
+- Preset-owned values are grayed out with hover explanations; an **Unlock** button
+  keeps the current values while allowing edits.
+- Mouse-wheel value adjustment is available as an opt-in setting and is disabled by
+  default to prevent accidental parameter changes.
 
 ## Requirements
 
@@ -56,6 +60,12 @@ Download a release archive from
 
 The portable folder already contains FFmpeg, FFprobe and FFplay. A `config` directory
 next to `AxiomPy.exe` keeps settings and presets with the application.
+
+Keep the extracted folder intact: the bundled tools are stored under `_internal`.
+Moving `AxiomPy.exe` away from that folder will make FFmpeg unavailable. If you see a
+missing-file message such as `..\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe`, you are
+running an old package that bundled a package-manager shim instead of the real
+FFmpeg binaries; download release 0.2.1 or later.
 
 ### From source
 
@@ -93,6 +103,12 @@ axiom-cli --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --pri
 Input/Output is a dedicated panel. The Script and Log docks are resizable and their
 layout is included in workspace snapshots.
 
+New installations start with **MP4** as the container and **all** audio streams
+selected. Choosing a preset locks the preset identity controls (container, codecs,
+quality, stream selection and hardware path). Locked controls are disabled and show
+the reason on hover; click **Unlock** to keep those values and edit them, or choose
+`Preset` to return to manual defaults.
+
 ### Hardware acceleration
 
 Set **Video → Encoding → Hardware Acceleration** to `On` to expose hardware codec
@@ -105,6 +121,10 @@ Hardware quality arguments follow the original Axiom tables. Encoder availabilit
 depends on the installed GPU driver and FFmpeg build; feature detection cannot
 guarantee that a driver session will open successfully.
 
+NVENC uses `-rc:v vbr_hq` with CRF/CQ values, QSV uses `-global_quality` with
+look-ahead, and AMF uses its native `-rc qvbr -qvbr_quality_level` options. H.264 and
+HEVC NVENC commands are covered by opt-in real-encoder tests.
+
 ### Workspace and interface settings
 
 Open **Settings → System** to configure:
@@ -112,6 +132,8 @@ Open **Settings → System** to configure:
 - **Font Size**: 8–16 pt, applied immediately to the application and stylesheet.
 - **Save workspace on exit**: when enabled, AxiomPy restores window geometry, dock
   layout, active tabs, edited script and conversion parameters on the next launch.
+- **Mouse wheel adjusts values**: disabled by default; enable it only if you want the
+  wheel to change combo boxes and spin boxes without clicking them first.
 
 The default window size is 1280x720. A restored workspace takes precedence over the
 default size.
@@ -145,7 +167,10 @@ $env:AXIOM_FFMPEG_BIN = "C:\ffmpeg\bin"
 ```
 
 `build.ps1` also accepts `-FfmpegBin` and `-Python`. If `AXIOM_FFMPEG_BIN` is omitted,
-the script tries `ffmpeg.exe` from `PATH`. Output is written to `dist\AxiomPy`.
+the script tries `ffmpeg.exe` from `PATH`. It refuses to bundle small package-manager
+shims or `.shim` companions, because those launch helpers do not contain FFmpeg and
+fail after the package is moved. Output is written to `dist\AxiomPy`;
+`verify.ps1` starts each bundled tool with `-version` before the package is published.
 
 ## Development
 
@@ -157,8 +182,8 @@ pytest -q
 
 Current validation on the development machine:
 
-- `342 passed, 2 skipped`
-- opt-in real FFmpeg conversion tests: `2 passed`
+- `347 passed, 4 skipped`
+- opt-in real FFmpeg conversion tests: `4 passed`, including H.264 and HEVC NVENC
 - 13 native Windows screenshot pages matched at `0.0000%`
 
 ### Parity harness
