@@ -80,11 +80,19 @@ def test_preset_locks_identity_controls_with_hover_reason(qtbot):
         assert not widget.isEnabled()
         assert "HD High" in widget.toolTip()
         assert "Unlock" in widget.toolTip()
+    container_label = window.widget_labels["Format.Format_Container_SelectedItem"]
+    assert not container_label.isEnabled()
+    assert "HD High" in container_label.toolTip()
+    assert not window.preset_hint.isHidden()
+    assert "HD High" in window.preset_hint.text()
+    assert "Hover" in window.preset_hint.text()
 
     window.preset_unlock_button.click()
     assert container.isEnabled()
     assert codec.isEnabled()
+    assert container_label.isEnabled()
     assert window.preset_unlock_button.isHidden()
+    assert window.preset_hint.isHidden()
 
     window.preset_combo.setCurrentText("Preset")
     assert container.isEnabled()
@@ -456,3 +464,17 @@ def test_run_releases_worker_only_after_thread_finishes(qtbot, monkeypatch):
     assert window._worker is not None
     qtbot.waitUntil(lambda: window._worker is None, timeout=2000)
     assert window.status_label.text() == "Failed with exit code -22"
+
+
+def test_nvenc_api_mismatch_gets_actionable_status(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    window._on_log(
+        "Driver does not support the required nvenc API version. "
+        "Required: 13.1 Found: 13.0"
+    )
+    window._on_run_done(1, False)
+
+    assert "NVENC driver mismatch" in window.status_label.text()
+    assert "Hardware Acceleration" in window.status_label.text()

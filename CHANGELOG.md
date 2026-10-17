@@ -3,6 +3,21 @@
 All notable changes to AxiomPy are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-10-17
+
+### Added
+
+- A persistent preset hint above Input/Output, in addition to the grayed
+  controls, hover reasons and Unlock action.
+- Actionable status text when FFmpeg reports an NVENC API/driver mismatch.
+
+### Changed
+
+- Portable releases now pin FFmpeg 7.1.1 (NVENC API 13.0, NVIDIA driver
+  570.00+) instead of FFmpeg 8.x (NVENC API 13.1, driver 610+).
+- The release workflow downloads, checksum-verifies and version-checks the
+  pinned FFmpeg archive before packaging.
+
 ## [0.2.1] - 2026-10-17
 
 ### Added

@@ -41,47 +41,38 @@ jobs:
       - name: Run test suite
         run: pytest -q -p no:cacheprovider
 
-      - name: Ensure FFmpeg tools are available
+      - name: Install compatible FFmpeg
         run: |
-          $ffmpeg = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
-          if (-not $ffmpeg) {
-            choco install ffmpeg -y --no-progress
-            $ffmpeg = Get-Command ffmpeg.exe -ErrorAction Stop
+          # Pin FFmpeg 7.1.1 for NVENC API 13.0 compatibility.  FFmpeg 8.x
+          # requires NVENC 13.1 / NVIDIA driver 610+, which breaks systems
+          # whose driver reports API 13.0.
+          $version = "7.1.1"
+          $url = "https://github.com/GyanD/codexffmpeg/releases/download/$version/ffmpeg-$version-essentials_build.zip"
+          $expected = "04861d3339c5ebe38b56c19a15cf2c0cc97f5de4fa8910e4d47e5e6404e4a2d4"
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg-$version.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "FFmpeg archive checksum mismatch: $actual"
           }
-
-          # Chocolatey puts a small shim on PATH.  PyInstaller must bundle the
-          # real binaries from the package's tools directory; copying a shim
-          # produces the "..\lib\ffmpeg\tools\..." missing-file error at runtime.
-          $candidates = @()
-          $roots = @()
-          if ($env:ProgramData) {
-            $roots += Join-Path $env:ProgramData "chocolatey\lib"
-          }
-          if ($env:ChocolateyInstall) {
-            $roots += Join-Path $env:ChocolateyInstall "lib"
-          }
-          $roots = $roots | Where-Object { Test-Path -LiteralPath $_ } |
-            Select-Object -Unique
-          if ($roots) {
-            $candidates += Get-ChildItem -Path $roots -Recurse -Filter ffmpeg.exe `
-              -ErrorAction SilentlyContinue |
-              Where-Object { $_.Length -ge 1MB -and -not (Test-Path ($_.FullName + ".shim")) }
-          }
-          if ($ffmpeg) {
-            $path_candidate = Get-Item -LiteralPath $ffmpeg.Source -ErrorAction SilentlyContinue
-            if ($path_candidate -and $path_candidate.Length -ge 1MB) {
-              $candidates += $path_candidate
-            }
-          }
-          $real = $candidates | Select-Object -First 1
+          $dest = Join-Path $env:RUNNER_TEMP "ffmpeg-$version"
+          Expand-Archive -LiteralPath $zip -DestinationPath $dest -Force
+          $real = Get-ChildItem -Path $dest -Recurse -Filter ffmpeg.exe |
+            Where-Object { $_.Directory.Name -eq "bin" } |
+            Select-Object -First 1
           if (-not $real) {
-            throw "Could not locate real FFmpeg binaries (only shims were found)."
+            throw "Could not locate the extracted FFmpeg binaries."
           }
-          $bin = Split-Path -Parent $real.FullName
+          $bin = $real.DirectoryName
           foreach ($name in @("ffmpeg.exe", "ffprobe.exe", "ffplay.exe")) {
             if (-not (Test-Path -LiteralPath (Join-Path $bin $name))) {
               throw "Missing $name next to $($real.FullName)"
             }
+          }
+          $versionText = & $real.FullName -version 2>&1 |
+            Select-Object -First 1
+          if ($versionText -notmatch "ffmpeg version $version") {
+            throw "Unexpected FFmpeg version: $($versionText -join ' ')"
           }
           "AXIOM_FFMPEG_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Append
 

@@ -30,8 +30,8 @@ option as raw text.
   PyInstaller build.
 - 1280x720 default layout, adjustable 8–16 pt interface font and optional restoration
   of the complete workspace on exit.
-- Preset-owned values are grayed out with hover explanations; an **Unlock** button
-  keeps the current values while allowing edits.
+- Preset-owned values are grayed out with a visible hint, hover explanations and an
+  **Unlock** button that keeps the current values while allowing edits.
 - Mouse-wheel value adjustment is available as an opt-in setting and is disabled by
   default to prevent accidental parameter changes.
 
@@ -46,6 +46,8 @@ option as raw text.
 
 The source code is Windows-first. The core layer is Qt-free and the platform layer
 keeps POSIX hooks, but Windows is the supported release target for this version.
+Portable releases bundle **FFmpeg 7.1.1**, whose NVENC API 13.0 works with NVIDIA
+driver 570.00 or newer. FFmpeg 8.x targets NVENC API 13.1 and requires driver 610+.
 
 ## Quick start
 
@@ -123,7 +125,10 @@ guarantee that a driver session will open successfully.
 
 NVENC uses `-rc:v vbr_hq` with CRF/CQ values, QSV uses `-global_quality` with
 look-ahead, and AMF uses its native `-rc qvbr -qvbr_quality_level` options. H.264 and
-HEVC NVENC commands are covered by opt-in real-encoder tests.
+HEVC NVENC commands are covered by opt-in real-encoder tests. The portable build pins
+FFmpeg 7.1.1 so a driver reporting NVENC API 13.0 does not fail against an FFmpeg
+binary compiled for API 13.1. If the driver is older than 570.00, update it, use
+x264/x265, or point Settings → FFmpeg at a compatible custom build.
 
 ### Workspace and interface settings
 
@@ -169,8 +174,10 @@ $env:AXIOM_FFMPEG_BIN = "C:\ffmpeg\bin"
 `build.ps1` also accepts `-FfmpegBin` and `-Python`. If `AXIOM_FFMPEG_BIN` is omitted,
 the script tries `ffmpeg.exe` from `PATH`. It refuses to bundle small package-manager
 shims or `.shim` companions, because those launch helpers do not contain FFmpeg and
-fail after the package is moved. Output is written to `dist\AxiomPy`;
-`verify.ps1` starts each bundled tool with `-version` before the package is published.
+fail after the package is moved. The release workflow downloads the pinned FFmpeg
+7.1.1 archive, checks its SHA-256, and verifies the version before building. Output is
+written to `dist\AxiomPy`; `verify.ps1` starts each bundled tool with `-version` before
+the package is published.
 
 ## Development
 
@@ -182,7 +189,7 @@ pytest -q
 
 Current validation on the development machine:
 
-- `347 passed, 4 skipped`
+- `349 passed, 4 skipped`
 - opt-in real FFmpeg conversion tests: `4 passed`, including H.264 and HEVC NVENC
 - 13 native Windows screenshot pages matched at `0.0000%`
 

@@ -26,8 +26,8 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 - 内置预设、ffprobe 分析、预览、输入/输出拖放以及 PyInstaller 便携版构建。
 - 默认采用 1280x720 布局，支持 8–16 pt 界面字体缩放，并可在退出时选择是否恢复
   完整工作区。
-- 选择预设后，预设固定的参数会灰显，鼠标悬停可查看原因；点击 **Unlock**
-  可保留当前值并解锁编辑。
+- 选择预设后，预设固定的参数会灰显，并显示可见提示；鼠标悬停可查看原因，
+  点击 **Unlock** 可保留当前值并解锁编辑。
 - 鼠标滚轮调参作为可选项提供，默认关闭，避免误改参数。
 
 ## 系统要求
@@ -41,6 +41,8 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 
 当前版本以 Windows 为首要支持平台。核心层不依赖 Qt，平台层保留了 POSIX 接口，
 但正式发布目标仍是 Windows。
+便携版内置 **FFmpeg 7.1.1**，其 NVENC API 13.0 兼容 NVIDIA 570.00 或更新的驱动。
+FFmpeg 8.x 使用 NVENC API 13.1，要求驱动 610+，因此发布版固定使用 7.1.1。
 
 ## 快速开始
 
@@ -115,6 +117,10 @@ NVENC 使用 `-rc:v vbr_hq` 与 CRF/CQ，QSV 使用 `-global_quality` 和 look-a
 AMF 使用原生的 `-rc qvbr -qvbr_quality_level` 选项。H.264 与 HEVC NVENC 命令已由
 可选的真实硬件编码测试覆盖。
 
+便携版固定 FFmpeg 7.1.1，避免“驱动报告 NVENC API 13.0、FFmpeg 却要求 13.1”的
+不匹配错误。如果驱动版本低于 570.00，请升级驱动、改用 x264/x265，或在
+Settings → FFmpeg 中指定兼容的自定义 FFmpeg。
+
 ### 工作区与界面设置
 
 打开 **Settings → System** 可配置：
@@ -156,8 +162,8 @@ $env:AXIOM_FFMPEG_BIN = "C:\ffmpeg\bin"
 `build.ps1` 也接受 `-FfmpegBin` 和 `-Python`。未设置 `AXIOM_FFMPEG_BIN` 时，脚本会
 尝试从 `PATH` 中查找 `ffmpeg.exe`。脚本会拒绝打包体积很小的包管理器 shim 或带有
 `.shim` 伴随文件的启动器，因为这类文件不包含 FFmpeg，移动目录后必然失效。
-输出目录为 `dist\AxiomPy`；`verify.ps1` 会在发布前用 `-version` 启动三个内置工具
-进行验证。
+发布流程会下载固定版本的 FFmpeg 7.1.1、校验 SHA-256 并验证版本。输出目录为
+`dist\AxiomPy`；`verify.ps1` 会在发布前用 `-version` 启动三个内置工具进行验证。
 
 ## 开发
 
@@ -169,7 +175,7 @@ pytest -q
 
 当前开发环境的验证结果：
 
-- `347 passed, 4 skipped`
+- `349 passed, 4 skipped`
 - 可选的 FFmpeg 真实转换测试：`4 passed`，包含 H.264 与 HEVC NVENC
 - 13 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`
 

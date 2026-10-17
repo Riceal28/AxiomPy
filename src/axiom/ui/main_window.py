@@ -192,6 +192,7 @@ class MainWindow(QMainWindow):
         self.state.set("Main.ExternalConsole_IsChecked", False)
         self.presets = PresetStore()
         self.widgets: dict[str, QWidget] = {}
+        self.widget_labels: dict[str, QWidget] = {}
         self.combo_items: dict[str, str] = {}
         self._loading = False
         self._updating_script = False
@@ -204,6 +205,7 @@ class MainWindow(QMainWindow):
         self._cancel_event = threading.Event()
         self._metadata_loading = False
         self._batch_current_row = -1
+        self._last_error_hint = ""
         self._font_size = DEFAULT_FONT_SIZE
         self._save_workspace_on_exit = True
         self._mouse_wheel_adjust = False
@@ -338,6 +340,12 @@ class MainWindow(QMainWindow):
         ):
             output_buttons.addWidget(button)
         grid.addLayout(output_buttons, 1, 4)
+
+        self.preset_hint = QLabel("", self)
+        self.preset_hint.setObjectName("presetHint")
+        self.preset_hint.setWordWrap(True)
+        self.preset_hint.hide()
+        grid.addWidget(self.preset_hint, 2, 0, 1, 7)
 
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 5)
@@ -498,6 +506,9 @@ class MainWindow(QMainWindow):
         )
         form.addRow(label, combo)
         self.widgets[key] = combo
+        label_widget = form.labelForField(combo)
+        if label_widget is not None:
+            self.widget_labels[key] = label_widget
         return combo
 
     def _add_edit(
@@ -514,6 +525,9 @@ class MainWindow(QMainWindow):
         )
         form.addRow(label, edit)
         self.widgets[key] = edit
+        label_widget = form.labelForField(edit)
+        if label_widget is not None:
+            self.widget_labels[key] = label_widget
         return edit
 
     def _add_check(
@@ -530,6 +544,9 @@ class MainWindow(QMainWindow):
         )
         form.addRow(label, check)
         self.widgets[key] = check
+        label_widget = form.labelForField(check)
+        if label_widget is not None:
+            self.widget_labels[key] = label_widget
         return check
 
     def _add_spin(
@@ -545,6 +562,9 @@ class MainWindow(QMainWindow):
         spin.valueChanged.connect(lambda value, k=key: self._on_state_value(k, value))
         form.addRow(label, spin)
         self.widgets[key] = spin
+        label_widget = form.labelForField(spin)
+        if label_widget is not None:
+            self.widget_labels[key] = label_widget
         return spin
 
     def _add_double_spin(
@@ -562,6 +582,9 @@ class MainWindow(QMainWindow):
         spin.valueChanged.connect(lambda value, k=key: self._on_state_value(k, value))
         form.addRow(label, spin)
         self.widgets[key] = spin
+        label_widget = form.labelForField(spin)
+        if label_widget is not None:
+            self.widget_labels[key] = label_widget
         return spin
 
     def _build_format_tab(self) -> QWidget:
@@ -1335,15 +1358,32 @@ class MainWindow(QMainWindow):
             and preset_name not in ("", "Preset")
         )
         self.preset_unlock_button.setVisible(locked)
+        if locked:
+            self.preset_hint.setText(
+                f"Preset '{preset_name}' fixes the grayed values. "
+                "Hover over a grayed control for the reason, or click Unlock "
+                "to edit the current values."
+            )
+            self.preset_hint.show()
+        else:
+            self.preset_hint.hide()
         for key, widget in self.widgets.items():
             base = self._base_tooltips.get(key, "")
+            label = self.widget_labels.get(key)
             if locked and key in PRESET_LOCKED_KEYS:
+                reason = preset_lock_reason(key, preset_name)
                 widget.setEnabled(False)
-                widget.setToolTip(preset_lock_reason(key, preset_name))
+                widget.setToolTip(reason)
                 widget.setProperty("presetLocked", True)
+                if label is not None:
+                    label.setEnabled(False)
+                    label.setToolTip(reason)
             elif widget.property("presetLocked"):
                 widget.setToolTip(base)
                 widget.setProperty("presetLocked", False)
+                if label is not None:
+                    label.setEnabled(True)
+                    label.setToolTip("")
 
     def _list_paths(self, widget: QListWidget) -> list[str]:
         return [
@@ -2268,6 +2308,7 @@ class MainWindow(QMainWindow):
             return
 
         self.log_view.clear()
+        self._last_error_hint = ""
         self._cancel_event.clear()
         if self.batch_check.isChecked():
             self._reset_batch_status()
@@ -2284,6 +2325,14 @@ class MainWindow(QMainWindow):
 
     def _on_log(self, line: str) -> None:
         self.log_view.append(line)
+        if (
+            "Driver does not support the required nvenc API version" in line
+            or "minimum required Nvidia driver for nvenc" in line
+        ):
+            self._last_error_hint = (
+                "NVENC driver mismatch: update the NVIDIA driver, or set "
+                "Hardware Acceleration to Off and use x264/x265."
+            )
         if self.batch_check.isChecked():
             self._handle_batch_log(line)
 
@@ -2314,7 +2363,10 @@ class MainWindow(QMainWindow):
             self.progress_bar.setValue(1000)
             self.status_label.setText("Completed")
         else:
-            self.status_label.setText(f"Failed with exit code {code}")
+            self.status_label.setText(
+                self._last_error_hint
+                or f"Failed with exit code {code}"
+            )
         self.log_view.append(f"\nProcess exited with code {code}")
 
     def _on_worker_finished(self) -> None:

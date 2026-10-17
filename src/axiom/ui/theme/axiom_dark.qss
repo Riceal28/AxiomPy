@@ -25,6 +25,10 @@ QGroupBox#pathPanel::title {
     padding: 0 5px;
     color: #aeb4bc;
 }
+QLabel#presetHint {
+    color: #d5b46a;
+    padding: 3px 4px 1px 4px;
+}
 QTabBar::tab {
     background: #2b2e33;
     color: #c9c9c9;
@@ -36,12 +40,25 @@ QTabBar::tab:selected {
     background: #3a6ea5;
     color: white;
 }
-QLineEdit, QComboBox, QSpinBox, QTextEdit, QListWidget {
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {
     background: #17191c;
     border: 1px solid #3b3f46;
     border-radius: 3px;
     padding: 4px;
     selection-background-color: #3a6ea5;
+}
+QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled,
+QDoubleSpinBox:disabled, QTextEdit:disabled, QListWidget:disabled {
+    color: #6f747c;
+    background: #1b1d20;
+    border-color: #2c3036;
+}
+QCheckBox:disabled, QLabel:disabled, QPushButton:disabled {
+    color: #6f747c;
+}
+QPushButton:disabled {
+    background: #2a2d32;
+    border-color: #34373d;
 }
 QComboBox QAbstractItemView {
     background: #1d1f23;
