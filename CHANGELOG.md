@@ -7,6 +7,8 @@ All notable changes to AxiomPy are recorded here. This project follows
 
 ### Added
 
+- Release artifacts now include two portable archives: a full Windows package
+  with FFmpeg 7.1.1 and a smaller no-FFmpeg package that uses `PATH` or Settings.
 - Automatic tool-path fields now display the resolved FFmpeg/FFprobe/FFplay
   executable, with Browse and Auto buttons for manual selection.
 - The Log File setting has a Browse button.

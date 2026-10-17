@@ -45,8 +45,9 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 
 当前版本以 Windows 为首要支持平台。核心层不依赖 Qt，平台层保留了 POSIX 接口，
 但正式发布目标仍是 Windows。
-便携版内置 **FFmpeg 7.1.1**，其 NVENC API 13.0 兼容 NVIDIA 570.00 或更新的驱动。
-FFmpeg 8.x 使用 NVENC API 13.1，要求驱动 610+，因此发布版固定使用 7.1.1。
+完整便携版内置 **FFmpeg 7.1.1**，其 NVENC API 13.0 兼容 NVIDIA 570.00 或更新的
+驱动。FFmpeg 8.x 使用 NVENC API 13.1，要求驱动 610+，因此完整包固定使用 7.1.1。
+另有不内置 FFmpeg 的精简包，运行时从 `PATH` 或设置中读取工具路径。
 
 ## 快速开始
 
@@ -58,11 +59,17 @@ FFmpeg 8.x 使用 NVENC API 13.1，要求驱动 610+，因此发布版固定使�
 .\AxiomPy\AxiomPy.exe
 ```
 
-便携版已经包含 FFmpeg、FFprobe 和 FFplay。若 `AxiomPy.exe` 同级目录存在 `config`
+每个版本会发布两个 Windows 压缩包：
+
+- `AxiomPy-<version>-win64.zip`：内置 FFmpeg、FFprobe 和 FFplay，推荐直接使用。
+- `AxiomPy-<version>-win64-noffmpeg.zip`：不包含这三个工具，体积更小。需要自行
+  安装 FFmpeg，将其 `bin` 目录加入 `PATH`，或在 **设置 → Config** 中指定路径。
+
+两个压缩包解压后都包含 `AxiomPy` 目录。若 `AxiomPy.exe` 同级目录存在 `config`
 目录，设置和预设会保存在该目录中。
 
-请保持解压后的目录完整：内置工具位于 `_internal` 子目录中。单独移动
-`AxiomPy.exe` 会导致找不到 FFmpeg。如果出现
+请保持解压后的目录完整：完整包的内置工具位于 `_internal` 子目录中。单独移动
+`AxiomPy.exe` 会导致找不到内置 FFmpeg。如果出现
 `..\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe` 之类的缺失文件提示，说明运行的是
 误将包管理器 shim 打入压缩包的旧版本，请下载 0.2.1 或更新的 Release。
 
@@ -184,8 +191,16 @@ $env:AXIOM_FFMPEG_BIN = "C:\ffmpeg\bin"
 `build.ps1` 也接受 `-FfmpegBin` 和 `-Python`。未设置 `AXIOM_FFMPEG_BIN` 时，脚本会
 尝试从 `PATH` 中查找 `ffmpeg.exe`。脚本会拒绝打包体积很小的包管理器 shim 或带有
 `.shim` 伴随文件的启动器，因为这类文件不包含 FFmpeg，移动目录后必然失效。
-发布流程会下载固定版本的 FFmpeg 7.1.1、校验 SHA-256 并验证版本。输出目录为
-`dist\AxiomPy`；`verify.ps1` 会在发布前用 `-version` 启动三个内置工具进行验证。
+发布流程会下载固定版本的 FFmpeg 7.1.1、校验 SHA-256 并验证版本。构建会同时生成
+`dist\AxiomPy`（带 FFmpeg）和 `dist\AxiomPy-noffmpeg`（不带 FFmpeg）。发布前验证
+两个版本：
+
+```powershell
+.\packaging\verify.ps1 -Package "dist\AxiomPy"
+.\packaging\verify.ps1 -Package "dist\AxiomPy-noffmpeg" -NoFfmpeg
+```
+
+完整包会用 `-version` 启动三个内置工具；两个版本都会启动 `AxiomPy.exe` 做冒烟测试。
 
 ## 开发
 
@@ -197,9 +212,9 @@ pytest -q
 
 当前开发环境的验证结果：
 
-- `358 passed, 6 skipped`
-- 可选的 FFmpeg 真实转换测试：`6 passed`，包含 H.264/HEVC NVENC 与 Custom
-  CRF/码率用例
+- `371 passed, 8 skipped`
+- 可选的 FFmpeg 真实转换测试：`8 passed`，包含 H.264/HEVC NVENC 与 Custom
+  CRF/码率/CBR 用例
 - 13 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`
 
 ### 一致性测试工具

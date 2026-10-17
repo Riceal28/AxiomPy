@@ -1,5 +1,6 @@
 param(
-    [string]$Package = ""
+    [string]$Package = "",
+    [switch]$NoFfmpeg
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,18 +19,24 @@ $found = Get-ChildItem -LiteralPath $Package -Recurse -File |
     Where-Object { $tools -contains $_.Name } |
     Select-Object -ExpandProperty FullName
 
-foreach ($name in $tools) {
-    $tool = $found | Where-Object { (Split-Path -Leaf $_) -eq $name } |
-        Select-Object -First 1
-    if (-not $tool) {
-        throw "Bundled tool missing: $name"
+if ($NoFfmpeg) {
+    if ($found) {
+        throw "No-FFmpeg package still contains bundled tools: $($found -join ', ')"
     }
-    if ((Get-Item -LiteralPath $tool).Length -lt 1MB) {
-        throw "Bundled tool is a shim, not a real executable: $tool"
-    }
-    & $tool -version *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Bundled tool failed to start: $tool (exit $LASTEXITCODE)"
+} else {
+    foreach ($name in $tools) {
+        $tool = $found | Where-Object { (Split-Path -Leaf $_) -eq $name } |
+            Select-Object -First 1
+        if (-not $tool) {
+            throw "Bundled tool missing: $name"
+        }
+        if ((Get-Item -LiteralPath $tool).Length -lt 1MB) {
+            throw "Bundled tool is a shim, not a real executable: $tool"
+        }
+        & $tool -version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Bundled tool failed to start: $tool (exit $LASTEXITCODE)"
+        }
     }
 }
 
@@ -39,7 +46,8 @@ try {
     if ($process.HasExited) {
         throw "AxiomPy exited during startup with code $($process.ExitCode)"
     }
-    Write-Host "AxiomPy started successfully (PID $($process.Id))"
+    $flavor = if ($NoFfmpeg) { "no-FFmpeg" } else { "bundled-FFmpeg" }
+    Write-Host "AxiomPy ($flavor) started successfully (PID $($process.Id))"
 }
 finally {
     if (-not $process.HasExited) {

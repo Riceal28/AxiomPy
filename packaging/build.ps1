@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $projectRoot "dist\AxiomPy"
+$liteDist = Join-Path $projectRoot "dist\AxiomPy-noffmpeg"
 
 if (-not $FfmpegBin) {
     $ffmpeg = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
@@ -51,7 +52,38 @@ try {
         Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination $dist -Force
     }
     New-Item -ItemType Directory -Path (Join-Path $dist "config") -Force | Out-Null
-    Write-Host "Portable build: $dist"
+
+    # The no-FFmpeg package is the same application without the three bundled
+    # tools.  Tool lookup then falls back to Settings or PATH at runtime.
+    if (Test-Path -LiteralPath $liteDist) {
+        $distRoot = Join-Path $projectRoot "dist"
+        if (-not $liteDist.StartsWith($distRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to replace a directory outside dist: $liteDist"
+        }
+        Remove-Item -LiteralPath $liteDist -Recurse -Force
+    }
+    Copy-Item -LiteralPath $dist -Destination $liteDist -Recurse
+    foreach ($name in @("ffmpeg.exe", "ffprobe.exe", "ffplay.exe")) {
+        $tools = @(
+            Get-ChildItem -LiteralPath $liteDist -Recurse -File -Filter $name
+        )
+        if (-not $tools) {
+            throw "Expected to strip $name from the no-FFmpeg build."
+        }
+        foreach ($tool in $tools) {
+            Remove-Item -LiteralPath $tool.FullName -Force
+        }
+    }
+    $remaining = @(
+        Get-ChildItem -LiteralPath $liteDist -Recurse -File |
+            Where-Object { @("ffmpeg.exe", "ffprobe.exe", "ffplay.exe") -contains $_.Name }
+    )
+    if ($remaining) {
+        throw "No-FFmpeg build still contains: $($remaining.FullName -join ', ')"
+    }
+
+    Write-Host "Portable build (with FFmpeg): $dist"
+    Write-Host "Portable build (no FFmpeg): $liteDist"
 }
 finally {
     Pop-Location

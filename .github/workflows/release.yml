@@ -79,7 +79,12 @@ jobs:
       - name: Build portable package
         run: .\packaging\build.ps1
 
-      - name: Create release archive and checksum
+      - name: Verify portable packages
+        run: |
+          .\packaging\verify.ps1 -Package "dist\AxiomPy"
+          .\packaging\verify.ps1 -Package "dist\AxiomPy-noffmpeg" -NoFfmpeg
+
+      - name: Create release archives and checksums
         shell: pwsh
         run: |
           $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
@@ -88,13 +93,37 @@ jobs:
             $env:GITHUB_REF_NAME
           }
           $version = $tag.TrimStart("v")
-          $asset = "AxiomPy-$version-win64.zip"
-          Compress-Archive -Path "dist\AxiomPy" -DestinationPath $asset -Force
-          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $asset).Hash.ToLowerInvariant()
-          "$hash  $asset" | Set-Content -Encoding ascii "$asset.sha256"
+          $packages = @(
+            @{
+              Source = "dist\AxiomPy"
+              Asset = "AxiomPy-$version-win64.zip"
+            },
+            @{
+              Source = "dist\AxiomPy-noffmpeg"
+              Asset = "AxiomPy-$version-win64-noffmpeg.zip"
+            }
+          )
+          $assets = @()
+          foreach ($package in $packages) {
+            if (-not (Test-Path -LiteralPath $package.Source)) {
+              throw "Missing package directory: $($package.Source)"
+            }
+            $stagingRoot = Join-Path $env:RUNNER_TEMP "release-$($package.Asset)"
+            $stagingApp = Join-Path $stagingRoot "AxiomPy"
+            if (Test-Path -LiteralPath $stagingRoot) {
+              Remove-Item -LiteralPath $stagingRoot -Recurse -Force
+            }
+            New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
+            Copy-Item -LiteralPath $package.Source -Destination $stagingApp -Recurse
+            Compress-Archive -Path $stagingApp -DestinationPath $package.Asset -Force
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $package.Asset).Hash.ToLowerInvariant()
+            "$hash  $($package.Asset)" |
+              Set-Content -Encoding ascii "$($package.Asset).sha256"
+            $assets += $package.Asset
+          }
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "RELEASE_ASSET=$asset" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_ASSETS=$($assets -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Publish GitHub release
         shell: pwsh
@@ -103,18 +132,22 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $title = "AxiomPy $env:RELEASE_VERSION"
-          $asset = $env:RELEASE_ASSET
           $notes = "docs/releases/$tag.md"
+          $files = @()
+          foreach ($asset in $env:RELEASE_ASSETS.Split(";")) {
+            $files += $asset
+            $files += "$asset.sha256"
+          }
 
           if (gh release view $tag 2>$null) {
-            gh release upload $tag $asset "$asset.sha256" --clobber
+            gh release upload $tag @files --clobber
           } elseif (Test-Path -LiteralPath $notes) {
-            gh release create $tag $asset "$asset.sha256" `
+            gh release create $tag @files `
               --title $title `
               --notes-file $notes `
               --latest
           } else {
-            gh release create $tag $asset "$asset.sha256" `
+            gh release create $tag @files `
               --title $title `
               --generate-notes `
               --latest

@@ -50,8 +50,9 @@ option as raw text.
 
 The source code is Windows-first. The core layer is Qt-free and the platform layer
 keeps POSIX hooks, but Windows is the supported release target for this version.
-Portable releases bundle **FFmpeg 7.1.1**, whose NVENC API 13.0 works with NVIDIA
-driver 570.00 or newer. FFmpeg 8.x targets NVENC API 13.1 and requires driver 610+.
+The full portable release bundles **FFmpeg 7.1.1**, whose NVENC API 13.0 works with
+NVIDIA driver 570.00 or newer. FFmpeg 8.x targets NVENC API 13.1 and requires driver
+610+. A smaller no-FFmpeg archive relies on FFmpeg from `PATH` or Settings.
 
 ## Quick start
 
@@ -64,14 +65,23 @@ Download a release archive from
 .\AxiomPy\AxiomPy.exe
 ```
 
-The portable folder already contains FFmpeg, FFprobe and FFplay. A `config` directory
-next to `AxiomPy.exe` keeps settings and presets with the application.
+Two Windows archives are published for each version:
 
-Keep the extracted folder intact: the bundled tools are stored under `_internal`.
-Moving `AxiomPy.exe` away from that folder will make FFmpeg unavailable. If you see a
-missing-file message such as `..\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe`, you are
-running an old package that bundled a package-manager shim instead of the real
-FFmpeg binaries; download release 0.2.1 or later.
+- `AxiomPy-<version>-win64.zip` includes FFmpeg, FFprobe and FFplay. This is the
+  recommended package for a self-contained setup.
+- `AxiomPy-<version>-win64-noffmpeg.zip` is smaller and does not include the three
+  tools. Install FFmpeg separately, put its `bin` directory on `PATH`, or select the
+  executables in **Settings → Config**.
+
+Both archives extract to an `AxiomPy` folder. A `config` directory next to
+`AxiomPy.exe` keeps settings and presets with the application.
+
+Keep the extracted folder intact: in the full package the bundled tools are stored
+under `_internal`. Moving `AxiomPy.exe` away from that folder will make the bundled
+FFmpeg unavailable. If you see a missing-file message such as
+`..\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe`, you are running an old package that
+bundled a package-manager shim instead of the real FFmpeg binaries; download release
+0.2.1 or later.
 
 ### From source
 
@@ -216,9 +226,17 @@ $env:AXIOM_FFMPEG_BIN = "C:\ffmpeg\bin"
 the script tries `ffmpeg.exe` from `PATH`. It refuses to bundle small package-manager
 shims or `.shim` companions, because those launch helpers do not contain FFmpeg and
 fail after the package is moved. The release workflow downloads the pinned FFmpeg
-7.1.1 archive, checks its SHA-256, and verifies the version before building. Output is
-written to `dist\AxiomPy`; `verify.ps1` starts each bundled tool with `-version` before
-the package is published.
+7.1.1 archive, checks its SHA-256, and verifies the version before building. The build
+creates `dist\AxiomPy` with FFmpeg and `dist\AxiomPy-noffmpeg` without it. Verify both
+variants before publishing:
+
+```powershell
+.\packaging\verify.ps1 -Package "dist\AxiomPy"
+.\packaging\verify.ps1 -Package "dist\AxiomPy-noffmpeg" -NoFfmpeg
+```
+
+The full-package verification starts each bundled tool with `-version`; both variants
+start `AxiomPy.exe` for a smoke test.
 
 ## Development
 
@@ -230,9 +248,9 @@ pytest -q
 
 Current validation on the development machine:
 
-- `358 passed, 6 skipped`
-- opt-in real FFmpeg conversion tests: `6 passed`, including H.264/HEVC NVENC and
-  Custom CRF/bitrate cases
+- `371 passed, 8 skipped`
+- opt-in real FFmpeg conversion tests: `8 passed`, including H.264/HEVC NVENC and
+  Custom CRF/bitrate/CBR cases
 - 13 native Windows screenshot pages matched at `0.0000%`
 
 ### Parity harness
