@@ -158,6 +158,7 @@ def test_batch_progress_reports_current_file_and_total(tmp_path, monkeypatch):
     plan = ProgressPlan(tmp_path, batch=True, pass_count=1)
     current = []
     total = []
+    fields = []
     monitor = _ProgressMonitor(
         plan,
         None,
@@ -165,6 +166,8 @@ def test_batch_progress_reports_current_file_and_total(tmp_path, monkeypatch):
         lambda fraction, name: total.append((fraction, name)),
         500,
         [first, second],
+        "ffprobe",
+        lambda values, name: fields.append((dict(values), name)),
     )
 
     (tmp_path / "progress-one.mp4-p1.txt").write_text(
@@ -174,6 +177,8 @@ def test_batch_progress_reports_current_file_and_total(tmp_path, monkeypatch):
     assert monitor.poll() == pytest.approx(0.5)
     assert current[-1] == (1.0, "one.mp4")
     assert total[-1] == (0.5, "one.mp4")
+    assert fields[-1][1] == "one.mp4"
+    assert fields[-1][0]["out_time_us"] == "10000000"
 
     (tmp_path / "progress-two.mp4-p1.txt").write_text(
         "out_time_us=2500000\nprogress=continue\n",
@@ -182,6 +187,7 @@ def test_batch_progress_reports_current_file_and_total(tmp_path, monkeypatch):
     assert monitor.poll() == pytest.approx(0.625)
     assert current[-1] == (0.25, "two.mp4")
     assert total[-1] == (0.625, "two.mp4")
+    assert fields[-1][1] == "two.mp4"
 
     (tmp_path / "progress-two.mp4-p1.txt").write_text(
         "out_time_us=10000000\nprogress=end\n",
@@ -189,6 +195,60 @@ def test_batch_progress_reports_current_file_and_total(tmp_path, monkeypatch):
     )
     assert monitor.poll() == 1.0
     assert monitor.finished is True
+
+
+def test_real_batch_run_emits_total_progress(tmp_path, monkeypatch):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    first = inputs / "one.mp4"
+    second = inputs / "two.mp4"
+    first.write_bytes(b"x")
+    second.write_bytes(b"x")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "ffmpeg.cmd").write_text(
+        "@echo off\r\n"
+        "set \"progress=\"\r\n"
+        ":parse\r\n"
+        "if \"%~1\"==\"\" goto write\r\n"
+        "if /I \"%~1\"==\"-progress\" set \"progress=%~2\"\r\n"
+        "shift\r\n"
+        "goto parse\r\n"
+        ":write\r\n"
+        "> \"%progress%\" echo out_time_us=10000000\r\n"
+        ">> \"%progress%\" echo progress=end\r\n",
+        encoding="ascii",
+    )
+    monkeypatch.setattr(
+        runner_module,
+        "probe_duration",
+        lambda path, ffprobe="ffprobe": 10.0,
+    )
+    totals = []
+    script = (
+        f'cd /d "{inputs}" && for %f in (*.mp4) do (echo) && '
+        'ffmpeg -y -i "%~f" "%~nf.out.mp4"'
+    )
+
+    code = run(
+        script,
+        RunOptions(
+            batch_files=[first, second],
+            progress_interval_ms=100,
+            extra_environment={
+                "PATH": str(bin_dir)
+                + os.pathsep
+                + os.environ.get("PATH", "")
+            },
+        ),
+        on_total_progress=lambda fraction, name: totals.append(
+            (fraction, name)
+        ),
+    )
+
+    assert code == 0
+    assert totals
+    assert totals[-1] == (1.0, "two.mp4")
 
 
 def test_windows_dword_exit_codes_are_normalized():

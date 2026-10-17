@@ -8,7 +8,9 @@ Python port the same lifetime without leaking state between conversions.
 from __future__ import annotations
 
 import ntpath
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List
 
 from ..state import AxiomState
@@ -55,10 +57,48 @@ AUDIO_FORMATS = {
     ".8svx",
 }
 
+MEDIA_OUTPUT_SUFFIXES = {
+    ".aac", ".avi", ".bmp", ".flac", ".gif", ".jpeg", ".jpg", ".m2ts",
+    ".m4a", ".m4v", ".mkv", ".mov", ".mp3", ".mp4", ".mpeg", ".mpg",
+    ".ogg", ".opus", ".png", ".tif", ".tiff", ".ts", ".wav", ".webm",
+    ".webp", ".wmv",
+}
+
 
 def _windows_dir(path: str) -> str:
-    directory = ntpath.dirname(path)
-    return directory.rstrip("\\") + "\\" if directory else ".\\"
+    directory = ntpath.normpath(ntpath.dirname(path))
+    if not directory or directory == ".":
+        return ".\\"
+    return directory if directory.endswith("\\") else directory + "\\"
+
+
+def _windows_directory(path: str) -> str:
+    """Normalize a directory path and keep exactly one trailing separator."""
+    if not path:
+        return ""
+    stripped = path.rstrip("\\/")
+    if not stripped:
+        return path
+    directory = ntpath.normpath(stripped)
+    return directory if directory.endswith("\\") else directory + "\\"
+
+
+def _windows_output_dir(path: str) -> str:
+    """Normalize a configured output directory without doubling separators.
+
+    The UI browse button appends a trailing separator, while hand-edited
+    settings often do not.  A path with a file extension is still accepted as
+    an output filename for backward compatibility.
+    """
+    if not path:
+        return ""
+    stripped = path.rstrip("\\/")
+    looks_like_file = (
+        ntpath.splitext(stripped)[1].lower() in MEDIA_OUTPUT_SUFFIXES
+    )
+    if looks_like_file and not os.path.isdir(path):
+        return _windows_dir(path)
+    return _windows_directory(path)
 
 
 def _threads(state: AxiomState) -> str:
@@ -154,7 +194,7 @@ def build_context(state: AxiomState) -> BuildContext:
     batch = bool(state.get("Main.Batch_IsChecked"))
     if batch:
         batch_input_directory = input_text
-        input_dir = input_text.rstrip("\\") + "\\" if input_text else ""
+        input_dir = _windows_directory(input_text) if input_text else ""
         input_ext = _batch_extension(state)
         input_filename = (
             "%f"
@@ -172,14 +212,16 @@ def build_context(state: AxiomState) -> BuildContext:
     output_text = str(state.get("Main.Output_Text") or "")
     output_ext = "." + str(state.get("Format.Format_Container_SelectedItem") or "")
     if batch:
-        output_dir = _windows_dir(output_text) if output_text else input_dir
+        output_dir = (
+            _windows_output_dir(output_text) if output_text else input_dir
+        )
         output_filename = (
             "%~nf"
             if (state.get("Configure.Shell_SelectedItem") or "CMD") == "CMD"
             else "$outputName"
         )
     elif output_text:
-        output_dir = _windows_dir(output_text)
+        output_dir = _windows_output_dir(output_text)
         base_name = naming.token_remover(state, input_filename)
         output_filename = naming.file_renamer(
             state,
@@ -263,6 +305,18 @@ def build_context(state: AxiomState) -> BuildContext:
             for path in (state.values.get("_audio_paths") or [])
         ],
     )
+
+
+def batch_output_path(state: AxiomState, input_path: str | Path) -> str:
+    """Return the real output path for one file in the current batch."""
+    ctx = build_context(state)
+    if state.get("Format.Format_MediaType_SelectedItem") == "Sequence":
+        filename = ctx.output_filename
+    else:
+        filename = ntpath.splitext(ntpath.basename(str(input_path)))[0]
+    if ctx.output_dir:
+        return ntpath.join(ctx.output_dir, filename + ctx.output_ext)
+    return filename + ctx.output_ext
 
 
 def join_args(*fragments: str | None) -> str:

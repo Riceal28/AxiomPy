@@ -18,9 +18,12 @@ def scan_batch_files(directory: Path | str, extension: str | None) -> list[Path]
     """Return regular files in ``directory`` matching the batch extension.
 
     An empty/placeholder extension means "all files", matching the original
-    wildcard batch behaviour.
+    wildcard batch behaviour.  A file path is treated as its containing
+    directory so enabling Batch after picking a file still builds a queue.
     """
     folder = Path(directory)
+    if folder.is_file():
+        folder = folder.parent
     if not folder.is_dir():
         return []
     wanted = normalize_batch_extension(extension)

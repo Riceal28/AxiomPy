@@ -118,6 +118,28 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background: #3a6ea5;
 }
+QTableView::indicator, QTableWidget::indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #8a93a0;
+    border-radius: 4px;
+    background: #101317;
+}
+QTableView::indicator:hover, QTableWidget::indicator:hover {
+    border-color: #b7d4f2;
+    background: #1c232b;
+}
+QTableView::indicator:checked, QTableWidget::indicator:checked {
+    background: #2f7fce;
+    border: 2px solid #a8d4ff;
+}
+QTableView::indicator:checked:hover, QTableWidget::indicator:checked:hover {
+    background: #3c93e5;
+}
+QTableView::indicator:disabled, QTableWidget::indicator:disabled {
+    border-color: #454b54;
+    background: #181a1e;
+}
 QDockWidget::title {
     background: #2b2e33;
     padding: 5px;

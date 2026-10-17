@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import os
 import re
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Mapping
 
 from PySide6.QtCore import (
     QByteArray,
@@ -19,10 +22,16 @@ from PySide6.QtCore import (
     QTimer,
     Signal,
 )
-from PySide6.QtGui import QAction, QCloseEvent, QColor, QGuiApplication
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QColor,
+    QGuiApplication,
+)
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QAbstractItemView,
+    QAbstractItemDelegate,
     QApplication,
     QCheckBox,
     QComboBox,
@@ -58,19 +67,23 @@ from axiom.core import controls
 from axiom.core.batch_scan import scan_batch_files
 from axiom.core.config import PresetStore, Settings, default_config_dir
 from axiom.core.generate import generate_runnable, resolve_controls
-from axiom.core.generate.context import build_context
+from axiom.core.generate.context import batch_output_path, build_context
 from axiom.core.generate.naming import OUTPUT_TOKEN_NAMES
 from axiom.core.notify import (
+    BATCH_NOTIFY_BATCH_END,
+    BATCH_NOTIFY_EACH_FILE,
     HTTP_METHODS,
     NOTIFY_FILE_NAME,
     NOTIFY_MESSAGE_EXAMPLE,
     PARAMETER_DEFINITIONS,
     NotifyConfig,
     NotifyHeader,
+    NotifyLoadError,
     NotifyParameter,
     NotifyStore,
     render_notify,
 )
+from axiom.core.probe import probe_notification_metadata
 from axiom.core.runner import (
     DEFAULT_PROGRESS_INTERVAL_MS,
     MIN_PROGRESS_INTERVAL_MS,
@@ -173,6 +186,7 @@ class _RunWorker(QThread):
     log = Signal(str)
     progress = Signal(float, str)
     total_progress = Signal(float, str)
+    progress_fields = Signal(object, str)
     done = Signal(int, bool)
 
     def __init__(
@@ -216,6 +230,7 @@ class _RunWorker(QThread):
                 cancel=self.cancel,
                 duration=self.duration,
                 report=self.report,
+                on_progress_fields=self.progress_fields.emit,
             )
         except Exception as error:
             self.log.emit(f"Failed to run process: {type(error).__name__}: {error}")
@@ -224,6 +239,52 @@ class _RunWorker(QThread):
             self.report.finished_at = time.time()
         code = normalize_exit_code(code)
         self.done.emit(code, self.cancel.is_set())
+
+
+class _NotifyProbeWorker(QThread):
+    """Run ffprobe work away from the GUI thread."""
+
+    completed = Signal(object, object, object)
+
+    def __init__(
+        self,
+        config: NotifyConfig,
+        context: Mapping[str, str],
+        input_path: Path | None,
+        output_path: Path | None,
+        ffprobe: str,
+    ) -> None:
+        super().__init__()
+        self.config = config
+        self.context = dict(context)
+        self.input_path = input_path
+        self.output_path = output_path
+        self.ffprobe = ffprobe
+
+    def run(self) -> None:
+        try:
+            metadata = probe_notification_metadata(
+                self.input_path,
+                self.output_path,
+                self.ffprobe,
+            )
+        except Exception:
+            metadata = _empty_notify_metadata()
+        self.completed.emit(self.config, self.context, metadata)
+
+
+def _empty_notify_metadata() -> dict[str, str]:
+    return {
+        "duration_seconds": "null",
+        "file_size_bytes": "0",
+        "video_codec": "",
+        "width": "null",
+        "height": "null",
+        "overall_bitrate": "null",
+        "duration": "",
+        "size": "",
+        "bitrate": "",
+    }
 
 
 class _WheelGuard(QObject):
@@ -269,6 +330,10 @@ class MainWindow(QMainWindow):
         self._cancel_event = threading.Event()
         self._metadata_loading = False
         self._batch_current_row = -1
+        self._batch_file_started: dict[int, datetime] = {}
+        self._batch_file_errors: dict[int, str] = {}
+        self._batch_notified_rows: set[int] = set()
+        self._batch_file_progress: dict[int, dict[str, str]] = {}
         self._last_error_hint = ""
         self._font_size = DEFAULT_FONT_SIZE
         self._progress_interval_ms = DEFAULT_PROGRESS_INTERVAL_MS
@@ -283,19 +348,33 @@ class MainWindow(QMainWindow):
             notify_path
             or (default_config_dir() / NOTIFY_FILE_NAME)
         )
-        self._notify_config = self._notify_store.load()
+        self._notify_load_warning = ""
+        if self._notify_store.path.exists():
+            try:
+                self._notify_config = self._notify_store.load_strict()
+            except NotifyLoadError as error:
+                self._notify_config = NotifyConfig.defaults()
+                self._notify_load_warning = str(error)
+        else:
+            self._notify_config = NotifyConfig.defaults()
         self._notify_loading = False
         self._notify_last_mtime: float | None = None
+        self._notify_last_size: int | None = None
+        self._notify_last_digest: str | None = None
+        self._notify_reload_attempts = 0
         self._notify_client = NotifyClient(self)
         self._notify_client.result.connect(self._on_notify_result)
-        self._notify_save_timer = QTimer(self)
-        self._notify_save_timer.setSingleShot(True)
-        self._notify_save_timer.setInterval(450)
-        self._notify_save_timer.timeout.connect(self._save_notify_config)
-        self._notify_watcher = QFileSystemWatcher(self)
-        self._notify_watcher.fileChanged.connect(
-            self._on_notify_file_changed
+        self._notify_probe_jobs: set[_NotifyProbeWorker] = set()
+        self._notify_closing = False
+        self._notify_in_flight = 0
+        self._notify_saving = False
+        self._notify_reload_timer = QTimer(self)
+        self._notify_reload_timer.setSingleShot(True)
+        self._notify_reload_timer.setInterval(180)
+        self._notify_reload_timer.timeout.connect(
+            self._reload_notify_from_disk
         )
+        self._notify_watcher = QFileSystemWatcher(self)
         self._notify_watcher.directoryChanged.connect(
             self._on_notify_file_changed
         )
@@ -310,6 +389,11 @@ class MainWindow(QMainWindow):
         self.state.set("Format.Format_Container_SelectedIndex", 2)
         self._build_ui()
         self._populate_notify_ui()
+        if self._notify_load_warning:
+            self.notify_status.setText(
+                f"Could not load notify.json: {self._notify_load_warning}. "
+                "Using defaults."
+            )
         self._update_notify_watcher()
         self._load_presets()
         self._refresh_controls(full=True)
@@ -574,8 +658,18 @@ class MainWindow(QMainWindow):
     def _install_wheel_guard(self) -> None:
         """Install the opt-in wheel filter on every value-editing control."""
 
-        candidates = [self.font_size_combo, *self.widgets.values()]
+        candidates = [
+            self.font_size_combo,
+            *self.widgets.values(),
+            *self.findChildren(QComboBox),
+            *self.findChildren(QAbstractSpinBox),
+        ]
+        seen: set[int] = set()
         for widget in candidates:
+            identity = id(widget)
+            if identity in seen:
+                continue
+            seen.add(identity)
             if isinstance(widget, (QComboBox, QAbstractSpinBox)):
                 widget.installEventFilter(self._wheel_guard)
 
@@ -1316,20 +1410,40 @@ class MainWindow(QMainWindow):
         connection = QGroupBox("HTTP", self)
         connection_form = QFormLayout(connection)
         self.notify_enabled_check = QCheckBox(
-            "Enable notifications after each run",
+            "Enable notifications",
             self,
         )
         self.notify_enabled_check.toggled.connect(
             self._on_notify_ui_changed
         )
         connection_form.addRow(self.notify_enabled_check)
+        self.notify_batch_mode_combo = QComboBox(self)
+        self.notify_batch_mode_combo.addItem(
+            "After each file in a batch",
+            BATCH_NOTIFY_EACH_FILE,
+        )
+        self.notify_batch_mode_combo.addItem(
+            "After entire batch",
+            BATCH_NOTIFY_BATCH_END,
+        )
+        self.notify_batch_mode_combo.setToolTip(
+            "Controls batch runs only. Single runs always notify once when "
+            "the run finishes."
+        )
+        self.notify_batch_mode_combo.currentIndexChanged.connect(
+            self._on_notify_ui_changed
+        )
+        connection_form.addRow(
+            "Batch notifications",
+            self.notify_batch_mode_combo,
+        )
         self.notify_hot_reload_check = QCheckBox(
             "Hot reload notify.json",
             self,
         )
         self.notify_hot_reload_check.setToolTip(
             "Watch notify.json and apply external edits without restarting. "
-            "Edits in this page are also written back after a short delay."
+            "Edits in this page are saved immediately."
         )
         self.notify_hot_reload_check.toggled.connect(
             self._on_notify_ui_changed
@@ -1367,7 +1481,8 @@ class MainWindow(QMainWindow):
         self.notify_header_table.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.Fixed
         )
-        self.notify_header_table.setColumnWidth(0, 42)
+        self.notify_header_table.setColumnWidth(0, 52)
+        self.notify_header_table.verticalHeader().setDefaultSectionSize(28)
         self.notify_header_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.Interactive
         )
@@ -1397,12 +1512,24 @@ class MainWindow(QMainWindow):
         self.notify_body_edit.setAcceptRichText(False)
         self.notify_body_edit.setMinimumHeight(170)
         self.notify_body_edit.setPlaceholderText(
-            '{"message": {message_json}, "status": "{status}"}'
+            '{"message": {message_json}, "output_path": "{output}"}'
         )
         self.notify_body_edit.textChanged.connect(
             self._on_notify_ui_changed
         )
         body_layout.addWidget(self.notify_body_edit)
+        body_insert = QHBoxLayout()
+        body_insert.addWidget(QLabel("Insert parameter:", body_group))
+        self.notify_body_parameter_combo = QComboBox(body_group)
+        self.notify_body_parameter_combo.setMinimumWidth(240)
+        body_insert.addWidget(self.notify_body_parameter_combo)
+        insert_body_parameter = QPushButton("Insert", body_group)
+        insert_body_parameter.clicked.connect(
+            self._insert_notify_body_parameter
+        )
+        body_insert.addWidget(insert_body_parameter)
+        body_insert.addStretch(1)
+        body_layout.addLayout(body_insert)
         layout.addWidget(body_group)
 
         actions = QHBoxLayout()
@@ -1438,7 +1565,11 @@ class MainWindow(QMainWindow):
             "for a complete template, or leave the field empty to build the "
             "message from enabled parameters. Renaming a parameter changes "
             "the automatic message and {params_json}, while template keys "
-            "stay stable.",
+            "stay stable. JSON Body values inside quotes are escaped "
+            "automatically; {message_json} and {params_json} embed complete "
+            "JSON values. The On checkbox controls the automatic message "
+            "and {params_json}. Disabled keys become empty or null in the "
+            "body; message-template placeholders still resolve.",
             self,
         )
         hint.setWordWrap(True)
@@ -1455,6 +1586,18 @@ class MainWindow(QMainWindow):
         example_layout.addWidget(self.notify_example_button)
         example_layout.addStretch(1)
         template_layout.addLayout(example_layout)
+        message_insert = QHBoxLayout()
+        message_insert.addWidget(QLabel("Insert parameter:", template_group))
+        self.notify_message_parameter_combo = QComboBox(template_group)
+        self.notify_message_parameter_combo.setMinimumWidth(240)
+        message_insert.addWidget(self.notify_message_parameter_combo)
+        insert_message_parameter = QPushButton("Insert", template_group)
+        insert_message_parameter.clicked.connect(
+            self._insert_notify_message_parameter
+        )
+        message_insert.addWidget(insert_message_parameter)
+        message_insert.addStretch(1)
+        template_layout.addLayout(message_insert)
         self.notify_message_edit = QTextEdit(self)
         self.notify_message_edit.setAcceptRichText(False)
         self.notify_message_edit.setMinimumHeight(170)
@@ -1475,7 +1618,8 @@ class MainWindow(QMainWindow):
         self.notify_parameter_table.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.Fixed
         )
-        self.notify_parameter_table.setColumnWidth(0, 42)
+        self.notify_parameter_table.setColumnWidth(0, 52)
+        self.notify_parameter_table.verticalHeader().setDefaultSectionSize(28)
         self.notify_parameter_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.Interactive
         )
@@ -1554,6 +1698,50 @@ class MainWindow(QMainWindow):
     def _insert_notify_message_example(self) -> None:
         self.notify_message_edit.setPlainText(NOTIFY_MESSAGE_EXAMPLE)
 
+    def _insert_notify_body_parameter(self) -> None:
+        self._insert_notify_placeholder(
+            self.notify_body_edit,
+            self.notify_body_parameter_combo,
+        )
+
+    def _insert_notify_message_parameter(self) -> None:
+        self._insert_notify_placeholder(
+            self.notify_message_edit,
+            self.notify_message_parameter_combo,
+        )
+
+    def _insert_notify_placeholder(
+        self,
+        editor: QTextEdit,
+        combo: QComboBox,
+    ) -> None:
+        key = str(combo.currentData() or "")
+        if not key:
+            return
+        cursor = editor.textCursor()
+        cursor.insertText(f"{{{key}}}")
+        editor.setTextCursor(cursor)
+        editor.setFocus()
+
+    def _refresh_notify_parameter_choices(self) -> None:
+        choices = [
+            (parameter.key, parameter.resolved_label())
+            for parameter in self._notify_config.parameters
+            if parameter.enabled
+        ]
+        for combo in (
+            self.notify_body_parameter_combo,
+            self.notify_message_parameter_combo,
+        ):
+            current = combo.currentData()
+            combo.clear()
+            for key, label in choices:
+                combo.addItem(f"{label} ({{{key}}})", key)
+            index = combo.findData(current)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+            combo.setEnabled(bool(choices))
+
     def _populate_notify_ui(self) -> None:
         if not hasattr(self, "notify_parameter_table"):
             return
@@ -1562,6 +1750,12 @@ class MainWindow(QMainWindow):
         try:
             self.notify_enabled_check.setChecked(config.enabled)
             self.notify_hot_reload_check.setChecked(config.hot_reload)
+            batch_index = self.notify_batch_mode_combo.findData(
+                config.batch_mode
+            )
+            self.notify_batch_mode_combo.setCurrentIndex(
+                batch_index if batch_index >= 0 else 1
+            )
             self.notify_method_combo.setCurrentText(
                 config.method if config.method in HTTP_METHODS else "POST"
             )
@@ -1638,17 +1832,35 @@ class MainWindow(QMainWindow):
             f"Config: {self._notify_store.path}"
         )
         self._notify_last_mtime = self._notify_mtime()
+        self._notify_last_size = self._notify_size()
+        self._notify_last_digest = self._notify_digest()
         self.notify_status.setText(
             "Notifications enabled"
             if config.enabled
             else "Notify is disabled"
         )
+        self._refresh_notify_parameter_choices()
         self._update_notify_preview()
         self._update_notify_watcher()
+        self._update_notify_batch_controls()
 
     def _notify_mtime(self) -> float | None:
         try:
             return self._notify_store.path.stat().st_mtime_ns
+        except OSError:
+            return None
+
+    def _notify_size(self) -> int | None:
+        try:
+            return self._notify_store.path.stat().st_size
+        except OSError:
+            return None
+
+    def _notify_digest(self) -> str | None:
+        try:
+            return hashlib.sha256(
+                self._notify_store.path.read_bytes()
+            ).hexdigest()
         except OSError:
             return None
 
@@ -1689,6 +1901,10 @@ class MainWindow(QMainWindow):
         return NotifyConfig(
             enabled=self.notify_enabled_check.isChecked(),
             hot_reload=self.notify_hot_reload_check.isChecked(),
+            batch_mode=str(
+                self.notify_batch_mode_combo.currentData()
+                or "batch_end"
+            ),
             method=self.notify_method_combo.currentText(),
             url=self.notify_url_edit.text(),
             timeout_ms=self.notify_timeout_spin.value(),
@@ -1698,23 +1914,53 @@ class MainWindow(QMainWindow):
             parameters=parameters,
         )
 
+    def _commit_notify_editors(self) -> None:
+        editor = QApplication.focusWidget()
+        if editor is None:
+            return
+        for table in (
+            self.notify_header_table,
+            self.notify_parameter_table,
+        ):
+            if editor is table or not table.isAncestorOf(editor):
+                continue
+            table.commitData(editor)
+            table.closeEditor(
+                editor,
+                QAbstractItemDelegate.EndEditHint.SubmitModelCache,
+            )
+            break
+
+    def _update_notify_batch_controls(self) -> None:
+        if not hasattr(self, "notify_batch_mode_combo"):
+            return
+        self.notify_batch_mode_combo.setEnabled(
+            self.batch_check.isChecked()
+        )
+
     def _on_notify_ui_changed(self, *_args) -> None:
         if self._notify_loading:
             return
         self._notify_config = self._notify_config_from_widgets()
+        self._refresh_notify_parameter_choices()
         self._update_notify_preview()
-        self._update_notify_watcher()
-        if self._notify_config.hot_reload:
-            self._notify_save_timer.start()
-        else:
-            self._notify_save_timer.stop()
+        self._save_notify_config()
 
     def _update_notify_watcher(self) -> None:
-        wanted = [str(self._notify_store.path.parent)]
-        if self._notify_store.path.exists():
-            wanted.append(str(self._notify_store.path))
-        if not self._notify_config.hot_reload:
-            wanted = []
+        # Watching only the directory avoids holding a Windows file handle
+        # that would make an editor's atomic replace (write + rename) fail.
+        try:
+            self._notify_store.path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+        except OSError:
+            pass
+        wanted = (
+            [str(self._notify_store.path.parent)]
+            if self._notify_config.hot_reload
+            else []
+        )
         existing = set(self._notify_watcher.directories())
         existing.update(self._notify_watcher.files())
         remove = [path for path in existing if path not in wanted]
@@ -1727,52 +1973,151 @@ class MainWindow(QMainWindow):
     def _on_notify_file_changed(self, *_args) -> None:
         if self._notify_loading or not self._notify_config.hot_reload:
             return
-        mtime = self._notify_mtime()
-        if mtime is None or mtime == self._notify_last_mtime:
+        self._notify_reload_attempts = 0
+        self._update_notify_watcher()
+        self._notify_reload_timer.start(180)
+
+    def _reload_notify_from_disk(self) -> None:
+        if self._notify_loading or not self._notify_config.hot_reload:
             return
-        self._notify_config = self._notify_store.load()
+        digest = self._notify_digest()
+        if digest is None:
+            self.notify_status.setText(
+                f"{self._notify_store.path.name} is unavailable; "
+                "keeping current settings"
+            )
+            return
+        if digest == self._notify_last_digest:
+            return
+        try:
+            config = self._notify_store.load_strict()
+        except NotifyLoadError as error:
+            if self._notify_reload_attempts < 4:
+                self._notify_reload_attempts += 1
+                self._notify_reload_timer.start(120)
+                self.notify_status.setText(
+                    "Waiting for notify.json to finish writing…"
+                )
+                return
+            self.notify_status.setText(
+                f"Hot reload failed: {error}. Keeping current settings."
+            )
+            return
+        self._notify_reload_attempts = 0
+        self._notify_config = config
         self._populate_notify_ui()
         self.notify_status.setText(
             f"Reloaded {self._notify_store.path.name}"
         )
 
     def _save_notify_config(self) -> None:
+        if self._notify_saving:
+            return
         if not hasattr(self, "notify_header_table"):
             return
-        if not self._notify_loading:
-            self._notify_config = self._notify_config_from_widgets()
+        self._notify_saving = True
         try:
-            self._notify_store.save(self._notify_config)
-        except OSError as error:
-            self.notify_status.setText(f"Could not save notify.json: {error}")
-            return
-        self._notify_last_mtime = self._notify_mtime()
-        self._update_notify_watcher()
-        self.notify_status.setText(
-            f"Saved {self._notify_store.path}"
-        )
+            self._commit_notify_editors()
+            if not self._notify_loading:
+                self._notify_config = self._notify_config_from_widgets()
+            try:
+                self._notify_store.save(self._notify_config)
+            except OSError as error:
+                self.notify_status.setText(
+                    f"Could not save notify.json: {error}"
+                )
+                return
+            self._notify_last_mtime = self._notify_mtime()
+            self._notify_last_size = self._notify_size()
+            self._notify_last_digest = self._notify_digest()
+            self._notify_reload_attempts = 0
+            self._notify_reload_timer.stop()
+            self._update_notify_watcher()
+            if not self._notify_in_flight:
+                self.notify_status.setText(
+                    f"Saved {self._notify_store.path}"
+                )
+        finally:
+            self._notify_saving = False
 
     def _reload_notify_config(self) -> None:
-        self._notify_config = self._notify_store.load()
+        try:
+            config = self._notify_store.load_strict()
+        except NotifyLoadError as error:
+            self.notify_status.setText(
+                f"Reload failed: {error}. Keeping current settings."
+            )
+            return
+        self._notify_config = config
+        self._notify_reload_attempts = 0
         self._populate_notify_ui()
         self.notify_status.setText("Notify config reloaded")
 
-    def _notify_test_context(self) -> dict[str, str]:
+    def _test_notify_output_info(self) -> tuple[str, str, str, str, str]:
         input_text = self.input_edit.text()
+        if self.batch_check.isChecked():
+            row = self._batch_current_row
+            if row < 0 and self.batch_list.rowCount():
+                row = 0
+            input_path = self._batch_input_path(row) if row >= 0 else None
+            if input_path is not None:
+                output_text = batch_output_path(self.state, input_path)
+                return (
+                    str(input_path),
+                    input_path.name,
+                    output_text,
+                    str(row + 1),
+                    input_path.name,
+                )
+            context = build_context(self.state)
+            return (
+                input_text,
+                Path(input_text).name if input_text else "",
+                context.output_dir,
+                "1",
+                "",
+            )
         context = build_context(self.state)
+        return (
+            input_text,
+            Path(input_text).name if input_text else "",
+            str(context.output_path),
+            "1",
+            "",
+        )
+
+    def _notify_test_context(self) -> dict[str, str]:
+        input_text, input_name, output_text, seq, current_file = (
+            self._test_notify_output_info()
+        )
+        batch = self.batch_check.isChecked()
+        counts = self._batch_status_counts() if batch else {}
         timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-        return {
+        result = {
+            "job_id": (
+                f"{timestamp}-{int(seq):03d}" if batch else timestamp
+            ),
             "status": "Test",
+            "success": "true",
+            "seq": seq,
             "exit_code": "0",
             "input": input_text,
-            "input_name": Path(input_text).name if input_text else "",
-            "output": context.output_path,
-            "output_name": Path(context.output_path).name,
+            "input_name": input_name,
+            "output": output_text,
+            "output_name": (
+                Path(output_text).name if output_text else ""
+            ),
             "elapsed": "0.00",
             "started_at": timestamp,
             "finished_at": timestamp,
             "duration": "0",
-            "current_file": "",
+            "duration_seconds": "0.000",
+            "file_size_bytes": "0",
+            "video_codec": "",
+            "width": "null",
+            "height": "null",
+            "overall_bitrate": "null",
+            "current_file": current_file,
             "file_progress": "100.0%",
             "total_progress": "100.0%",
             "time": "00:00:00.000000",
@@ -1787,14 +2132,16 @@ class MainWindow(QMainWindow):
                 self.state.get("Configure.Shell_SelectedItem") or "CMD"
             ),
             "cancelled": "false",
-            "batch": "false",
-            "batch_count": "0",
-            "batch_completed": "0",
-            "batch_failed": "0",
-            "batch_cancelled": "0",
+            "batch": "true" if batch else "false",
+            "batch_count": str(
+                self.batch_list.rowCount() if batch else 1
+            ),
+            "batch_completed": str(counts.get("Completed", 0)),
+            "batch_failed": str(counts.get("Failed", 0)),
+            "batch_cancelled": str(counts.get("Cancelled", 0)),
             "error": "",
-            "log": "Test notification from AxiomPy",
         }
+        return result
 
     def _update_notify_preview(self) -> None:
         if not hasattr(self, "notify_preview"):
@@ -1806,10 +2153,46 @@ class MainWindow(QMainWindow):
         header_lines = "\n".join(
             f"{name}: {value}" for name, value in rendered.headers
         )
+        body_error = (
+            f"\n\nBODY ERROR\n{rendered.body_error}"
+            if rendered.body_error
+            else ""
+        )
+        disabled = {
+            parameter.key
+            for parameter in self._notify_config.parameters
+            if not parameter.enabled
+        }
+        referenced = sorted(
+            disabled.intersection(
+                re.findall(
+                    r"\{([A-Za-z_][A-Za-z0-9_]*)\}",
+                    (
+                        self._notify_config.message_template
+                        + "\n"
+                        + self._notify_config.body
+                    ),
+                )
+            )
+        )
+        template_note = (
+            "\n\nTEMPLATE NOTE\nDisabled parameters are still referenced "
+            f"explicitly: {', '.join(referenced)}. Remove those placeholders "
+            "or re-enable them."
+            if referenced
+            else ""
+        )
+        unknown_note = (
+            "\n\nTEMPLATE WARNING\nUnknown placeholders: "
+            f"{', '.join(rendered.unknown_placeholders)}."
+            if rendered.unknown_placeholders
+            else ""
+        )
         self.notify_preview.setPlainText(
             f"MESSAGE\n{rendered.message}\n\n"
             f"REQUEST\n{rendered.method} {rendered.url}\n"
             f"{header_lines}\n\nBODY\n{rendered.body}"
+            f"{body_error}{template_note}{unknown_note}"
         )
 
     def _test_notification(self) -> None:
@@ -1817,29 +2200,31 @@ class MainWindow(QMainWindow):
         if not self._notify_config.url.strip():
             self.notify_status.setText("Enter a Notify URL first")
             return
-        sent = self._notify_client.send(
+        self._dispatch_notification(
             self._notify_config,
             self._notify_test_context(),
         )
-        if sent:
-            self.notify_status.setText("Sending test notification…")
+        self.notify_status.setText("Sending test notification…")
 
     def _on_notify_result(
         self,
+        request_id: str,
         ok: bool,
         status: int,
         body: str,
         error: str,
     ) -> None:
+        self._notify_in_flight = max(0, self._notify_in_flight - 1)
+        label = f" [{request_id}]" if request_id else ""
         if ok:
             detail = f"HTTP {status}" if status else "HTTP OK"
-            text = f"Notification sent ({detail})"
+            text = f"Notification{label} sent ({detail})"
         else:
             detail = error or f"HTTP {status or 'error'}"
             response = body.strip().replace("\n", " ")[:180]
             if response:
                 detail += f": {response}"
-            text = f"Notification failed: {detail}"
+            text = f"Notification{label} failed: {detail}"
         self.notify_status.setText(text)
         self.status_label.setText(text)
 
@@ -2272,6 +2657,7 @@ class MainWindow(QMainWindow):
         self._sync_widget_states()
         if self.batch_check.isChecked():
             self._refresh_batch_queue()
+        self._update_notify_preview()
         self._regenerate()
 
     def _sync_speed_text(self, value: str) -> None:
@@ -2290,6 +2676,8 @@ class MainWindow(QMainWindow):
         self.state.set("Main.BatchExtension_IsEnabled", checked)
         self._refresh_batch_queue()
         self._sync_widget_states()
+        self._update_notify_batch_controls()
+        self._update_notify_preview()
         if checked:
             self.batch_dock.raise_()
         self._regenerate()
@@ -2594,6 +2982,10 @@ class MainWindow(QMainWindow):
     def _refresh_batch_queue(self) -> None:
         self.batch_list.setRowCount(0)
         self._batch_current_row = -1
+        self._batch_file_started.clear()
+        self._batch_file_errors.clear()
+        self._batch_notified_rows.clear()
+        self._batch_file_progress.clear()
         if not self.batch_check.isChecked():
             self.batch_status.setText("Batch queue is empty")
             return
@@ -2612,6 +3004,14 @@ class MainWindow(QMainWindow):
         item = self.batch_list.item(row, 1)
         if item is None:
             return
+        previous = item.text()
+        if previous == status:
+            return
+        if status == "Running":
+            self._batch_file_started.setdefault(
+                row,
+                datetime.now().astimezone(),
+            )
         item.setText(status)
         colors = {
             "Pending": "#9aa0a6",
@@ -2622,6 +3022,8 @@ class MainWindow(QMainWindow):
         }
         item.setForeground(QColor(colors.get(status, "#e6e6e6")))
         self._update_batch_summary()
+        if status in ("Completed", "Failed", "Cancelled"):
+            self._maybe_notify_batch_file(row, status)
 
     def _update_batch_summary(self) -> None:
         counts: dict[str, int] = {}
@@ -2641,6 +3043,10 @@ class MainWindow(QMainWindow):
 
     def _reset_batch_status(self) -> None:
         self._batch_current_row = -1
+        self._batch_file_started.clear()
+        self._batch_file_errors.clear()
+        self._batch_notified_rows.clear()
+        self._batch_file_progress.clear()
         for row in range(self.batch_list.rowCount()):
             self._set_batch_row_status(row, "Pending")
 
@@ -2663,7 +3069,9 @@ class MainWindow(QMainWindow):
                     and self.batch_list.item(self._batch_current_row, 1).text()
                     == "Running"
                 ):
-                    self._set_batch_row_status(self._batch_current_row, "Completed")
+                    self._confirm_batch_row_completed(
+                        self._batch_current_row
+                    )
                 self._batch_current_row = row
                 self._set_batch_row_status(row, "Running")
             return
@@ -2671,6 +3079,7 @@ class MainWindow(QMainWindow):
             return
         lowered = line.lower()
         if "error opening" in lowered or "conversion failed" in lowered:
+            self._batch_file_errors[self._batch_current_row] = line
             self._set_batch_row_status(self._batch_current_row, "Failed")
 
     def _reveal_batch_item(self) -> None:
@@ -3103,6 +3512,9 @@ class MainWindow(QMainWindow):
         if not restored:
             self._populate_widgets()
             self._regenerate(force=True)
+        if self.batch_check.isChecked():
+            self._refresh_batch_queue()
+        self._update_notify_batch_controls()
         self.status_label.setText("Settings loaded")
         return settings
 
@@ -3194,10 +3606,20 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Nothing to run")
             return
 
+        is_batch = self.batch_check.isChecked()
+        if is_batch:
+            # Re-scan on Run so a queue restored from settings (or a folder
+            # changed outside the app) always matches the files on disk.
+            self._refresh_batch_queue()
+            if self.batch_list.rowCount() == 0:
+                self.status_label.setText(
+                    "Batch queue is empty; choose an input folder with "
+                    "matching files"
+                )
+                return
         self.log_view.clear()
         self._last_error_hint = ""
         self._cancel_event.clear()
-        is_batch = self.batch_check.isChecked()
         if is_batch:
             self._reset_batch_status()
         self.progress_bar.setValue(0)
@@ -3243,6 +3665,7 @@ class MainWindow(QMainWindow):
         self._worker.log.connect(self._on_log)
         self._worker.progress.connect(self._on_progress)
         self._worker.total_progress.connect(self._on_total_progress)
+        self._worker.progress_fields.connect(self._on_progress_fields)
         self._worker.done.connect(self._on_run_done)
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.start()
@@ -3266,6 +3689,19 @@ class MainWindow(QMainWindow):
             self.progress_bar.setToolTip(f"Current file: {file_name}")
             self._track_batch_progress_file(file_name)
 
+    def _on_progress_fields(
+        self,
+        fields: object,
+        file_name: str,
+    ) -> None:
+        if not self.batch_check.isChecked() or not file_name:
+            return
+        row = self._batch_row_for_name(file_name)
+        if row >= 0 and isinstance(fields, Mapping):
+            self._batch_file_progress[row] = {
+                str(key): str(value) for key, value in fields.items()
+            }
+
     def _on_total_progress(self, fraction: float, _file_name: str) -> None:
         self.total_progress_bar.setValue(
             max(0, min(1000, round(fraction * 1000)))
@@ -3278,9 +3714,8 @@ class MainWindow(QMainWindow):
         if self._batch_current_row >= 0 and self._batch_current_row != row:
             previous = self.batch_list.item(self._batch_current_row, 1)
             if previous is not None and previous.text() == "Running":
-                self._set_batch_row_status(
-                    self._batch_current_row,
-                    "Completed",
+                self._confirm_batch_row_completed(
+                    self._batch_current_row
                 )
         self._batch_current_row = row
         current = self.batch_list.item(row, 1)
@@ -3296,6 +3731,8 @@ class MainWindow(QMainWindow):
     def _on_run_done(self, code: int, cancelled: bool) -> None:
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
+        if self.batch_check.isChecked():
+            self._finalize_batch_rows(code, cancelled)
         if (
             self.batch_check.isChecked()
             and self._batch_current_row < 0
@@ -3312,11 +3749,27 @@ class MainWindow(QMainWindow):
             item = self.batch_list.item(self._batch_current_row, 1)
             if item is not None and item.text() == "Running":
                 if cancelled:
-                    self._set_batch_row_status(self._batch_current_row, "Cancelled")
-                elif code == 0:
-                    self._set_batch_row_status(self._batch_current_row, "Completed")
+                    self._set_batch_row_status(
+                        self._batch_current_row,
+                        "Cancelled",
+                    )
+                elif code == 0 and self._batch_output_current(
+                    self._batch_current_row
+                ):
+                    self._set_batch_row_status(
+                        self._batch_current_row,
+                        "Completed",
+                    )
                 else:
-                    self._set_batch_row_status(self._batch_current_row, "Failed")
+                    if code == 0:
+                        self._batch_file_errors.setdefault(
+                            self._batch_current_row,
+                            "The output file was not created or updated.",
+                        )
+                    self._set_batch_row_status(
+                        self._batch_current_row,
+                        "Failed",
+                    )
         if cancelled:
             self.status_label.setText("Cancelled")
         elif code == 0:
@@ -3330,6 +3783,34 @@ class MainWindow(QMainWindow):
             )
         self.log_view.append(f"\nProcess exited with code {code}")
         self._send_run_notification(code, cancelled)
+
+    def _finalize_batch_rows(self, code: int, cancelled: bool) -> None:
+        """Resolve batch rows when progress/log tracking missed a transition."""
+        if cancelled or code != 0:
+            return
+        worker = self._worker
+        started = worker.report.started_at if worker is not None else 0.0
+        for row in range(self.batch_list.rowCount()):
+            item = self.batch_list.item(row, 1)
+            if item is None or item.text() in (
+                "Completed",
+                "Failed",
+                "Cancelled",
+            ):
+                continue
+            input_path = self._batch_input_path(row)
+            if input_path is None:
+                continue
+            output_path = Path(batch_output_path(self.state, input_path))
+            if not output_path.is_file():
+                continue
+            try:
+                modified = output_path.stat().st_mtime
+            except OSError:
+                continue
+            if started and modified < started - 2:
+                continue
+            self._set_batch_row_status(row, "Completed")
 
     def _format_seconds(self, value: float | None) -> str:
         return "" if value is None else f"{float(value):.3f}"
@@ -3358,57 +3839,285 @@ class MainWindow(QMainWindow):
         ]
         return "\n".join(matches[-10:])
 
+    def _notify_ffprobe(self) -> str:
+        value = str(self.state.get("Configure.FFprobePath_Text") or "")
+        if not value or value == "<auto>":
+            return str(resolve_tool_path("<auto>", "ffprobe") or "ffprobe")
+        return value
+
+    def _batch_input_path(self, row: int) -> Path | None:
+        if row < 0:
+            return None
+        item = self.batch_list.item(row, 0)
+        if item is None:
+            return None
+        value = item.data(Qt.UserRole)
+        return Path(str(value or item.text()))
+
+    def _batch_output_current(self, row: int) -> bool:
+        input_path = self._batch_input_path(row)
+        if input_path is None:
+            return False
+        if (
+            self.state.get("Format.Format_MediaType_SelectedItem")
+            == "Sequence"
+        ):
+            return True
+        output_path = Path(batch_output_path(self.state, input_path))
+        if not output_path.is_file():
+            return False
+        started = self._batch_file_started.get(row)
+        if started is None:
+            return True
+        try:
+            return output_path.stat().st_mtime >= started.timestamp() - 2
+        except OSError:
+            return False
+
+    def _confirm_batch_row_completed(self, row: int) -> None:
+        if self._batch_output_current(row):
+            self._set_batch_row_status(row, "Completed")
+            return
+        self._batch_file_errors.setdefault(
+            row,
+            "The output file was not created or updated.",
+        )
+        self._set_batch_row_status(row, "Failed")
+
+    def _notify_metadata(
+        self,
+        input_path: Path | None,
+        output_path: Path | None,
+    ) -> dict[str, str]:
+        return probe_notification_metadata(
+            input_path,
+            output_path,
+            self._notify_ffprobe(),
+        )
+
+    def _run_output_info(self) -> tuple[Path | None, str, str]:
+        if self.batch_check.isChecked():
+            input_path = self._batch_input_path(self._batch_current_row)
+            if input_path is None:
+                return None, "", ""
+            return (
+                input_path,
+                batch_output_path(self.state, input_path),
+                input_path.name,
+            )
+        input_text = self.input_edit.text()
+        input_path = Path(input_text) if input_text else None
+        context = build_context(self.state)
+        return input_path, str(context.output_path), ""
+
+    def _batch_file_notify_context(
+        self,
+        row: int,
+        status: str,
+        *,
+        include_metadata: bool = True,
+    ) -> dict[str, str]:
+        input_path = self._batch_input_path(row)
+        output_path_text = (
+            batch_output_path(self.state, input_path)
+            if input_path is not None
+            else ""
+        )
+        output_path = Path(output_path_text) if output_path_text else None
+        metadata = (
+            self._notify_metadata(input_path, output_path)
+            if include_metadata
+            else _empty_notify_metadata()
+        )
+        worker = self._worker
+        stats = dict(self._batch_file_progress.get(row, {}))
+        now = datetime.now().astimezone()
+        started = self._batch_file_started.get(row, now)
+        elapsed = max(0.0, (now - started).total_seconds())
+        counts = self._batch_status_counts()
+        batch_count = self.batch_list.rowCount()
+        finished_count = (
+            counts.get("Completed", 0)
+            + counts.get("Failed", 0)
+            + counts.get("Cancelled", 0)
+        )
+        code = (
+            "0"
+            if status == "Completed"
+            else ("130" if status == "Cancelled" else "1")
+        )
+        shell = (
+            worker.options.shell
+            if worker is not None
+            else str(self.state.get("Configure.Shell_SelectedItem") or "CMD")
+        )
+        context = {
+            "job_id": f"{started.isoformat(timespec='seconds')}-{row + 1:03d}",
+            "status": status,
+            "success": "true" if status == "Completed" else "false",
+            "seq": str(row + 1),
+            "exit_code": code,
+            "input": str(input_path) if input_path is not None else "",
+            "input_name": input_path.name if input_path is not None else "",
+            "output": output_path_text,
+            "output_name": (
+                Path(output_path_text).name if output_path_text else ""
+            ),
+            "elapsed": f"{elapsed:.2f}",
+            "started_at": started.isoformat(timespec="seconds"),
+            "finished_at": now.isoformat(timespec="seconds"),
+            "duration": metadata["duration"],
+            "current_file": input_path.name if input_path is not None else "",
+            "file_progress": (
+                "100.0%"
+                if status == "Completed"
+                else f"{self.progress_bar.value() / 10:.1f}%"
+            ),
+            "total_progress": (
+                f"{finished_count / batch_count * 100:.1f}%"
+                if batch_count
+                else "0.0%"
+            ),
+            "time": stats.get("out_time", ""),
+            "frame": stats.get("frame", ""),
+            "fps": stats.get("fps", ""),
+            "bitrate": metadata["bitrate"] or stats.get("bitrate", ""),
+            "size": metadata["size"] or stats.get("total_size", ""),
+            "speed": stats.get("speed", ""),
+            "ffmpeg_progress": stats.get("progress", ""),
+            "command": worker.script if worker is not None else "",
+            "shell": shell,
+            "cancelled": "true" if status == "Cancelled" else "false",
+            "batch": "true",
+            "batch_count": str(batch_count),
+            "batch_completed": str(counts.get("Completed", 0)),
+            "batch_failed": str(counts.get("Failed", 0)),
+            "batch_cancelled": str(counts.get("Cancelled", 0)),
+            "error": (
+                self._batch_file_errors.get(row, "")
+                if status == "Failed"
+                else ""
+            ),
+        }
+        for key in (
+            "duration_seconds",
+            "file_size_bytes",
+            "video_codec",
+            "width",
+            "height",
+            "overall_bitrate",
+        ):
+            context[key] = metadata[key]
+        return context
+
+    def _maybe_notify_batch_file(self, row: int, status: str) -> None:
+        config = self._notify_config
+        if (
+            not config.enabled
+            or not config.url.strip()
+            or not self.batch_check.isChecked()
+            or config.batch_mode != BATCH_NOTIFY_EACH_FILE
+            or row in self._batch_notified_rows
+        ):
+            return
+        if self._batch_input_path(row) is None:
+            return
+        self._batch_notified_rows.add(row)
+        self._dispatch_notification(
+            config,
+            self._batch_file_notify_context(
+                row,
+                status,
+                include_metadata=False,
+            ),
+        )
+
     def _run_notify_context(
         self,
         code: int,
         cancelled: bool,
+        *,
+        include_metadata: bool = True,
     ) -> dict[str, str]:
         worker = self._worker
         report = worker.report if worker is not None else RunReport()
         stats = dict(report.last_progress)
-        context = build_context(self.state)
         started = report.started_at
         finished = report.finished_at or started
         elapsed = max(0.0, finished - started) if started else 0.0
-        counts = self._batch_status_counts()
-        status = (
-            "Cancelled"
-            if cancelled
-            else ("Completed" if code == 0 else "Failed")
-        )
+        is_batch = self.batch_check.isChecked()
+        counts = self._batch_status_counts() if is_batch else {}
+        if cancelled:
+            status = "Cancelled"
+        elif is_batch and counts.get("Failed", 0):
+            status = "Failed"
+        elif is_batch and counts.get("Cancelled", 0):
+            status = "Cancelled"
+        elif is_batch and counts.get("Pending", 0):
+            status = "Failed"
+        else:
+            status = "Completed" if code == 0 else "Failed"
         input_text = self.input_edit.text()
-        output_path = str(context.output_path)
+        input_path, output_path_text, current_file = self._run_output_info()
+        metadata = (
+            self._notify_metadata(
+                input_path,
+                Path(output_path_text) if output_path_text else None,
+            )
+            if include_metadata
+            else _empty_notify_metadata()
+        )
         script = worker.script if worker is not None else ""
         shell = (
             worker.options.shell
             if worker is not None
             else str(self.state.get("Configure.Shell_SelectedItem") or "CMD")
         )
-        log_lines = worker.log_lines if worker is not None else []
-        return {
+        started_text = (
+            datetime.fromtimestamp(started).astimezone().isoformat(
+                timespec="seconds"
+            )
+            if started
+            else ""
+        )
+        finished_text = (
+            datetime.fromtimestamp(finished).astimezone().isoformat(
+                timespec="seconds"
+            )
+            if finished
+            else ""
+        )
+        job_id = (
+            started_text
+            or finished_text
+            or datetime.now().astimezone().isoformat(timespec="seconds")
+        )
+        if is_batch:
+            job_id += "-batch"
+        seq = (
+            str(self._batch_current_row + 1)
+            if is_batch and self._batch_current_row >= 0
+            else "1"
+        )
+        context = {
+            "job_id": job_id,
             "status": status,
+            "success": "true" if status == "Completed" else "false",
+            "seq": seq,
             "exit_code": str(code),
             "input": input_text,
             "input_name": Path(input_text).name if input_text else "",
-            "output": output_path,
-            "output_name": Path(output_path).name,
+            "output": output_path_text,
+            "output_name": (
+                Path(output_path_text).name if output_path_text else ""
+            ),
             "elapsed": f"{elapsed:.2f}",
-            "started_at": (
-                datetime.fromtimestamp(started).astimezone().isoformat(
-                    timespec="seconds"
-                )
-                if started
-                else ""
+            "started_at": started_text,
+            "finished_at": finished_text,
+            "duration": (
+                metadata["duration"] or self._format_seconds(report.duration)
             ),
-            "finished_at": (
-                datetime.fromtimestamp(finished).astimezone().isoformat(
-                    timespec="seconds"
-                )
-                if finished
-                else ""
-            ),
-            "duration": self._format_seconds(report.duration),
-            "current_file": report.last_file,
+            "current_file": current_file or report.last_file,
             "file_progress": f"{self.progress_bar.value() / 10:.1f}%",
             "total_progress": (
                 f"{self.total_progress_bar.value() / 10:.1f}%"
@@ -3416,32 +4125,127 @@ class MainWindow(QMainWindow):
             "time": stats.get("out_time", ""),
             "frame": stats.get("frame", ""),
             "fps": stats.get("fps", ""),
-            "bitrate": stats.get("bitrate", ""),
-            "size": stats.get("total_size", ""),
+            "bitrate": metadata["bitrate"] or stats.get("bitrate", ""),
+            "size": metadata["size"] or stats.get("total_size", ""),
             "speed": stats.get("speed", ""),
             "ffmpeg_progress": stats.get("progress", ""),
             "command": script,
             "shell": shell,
             "cancelled": "true" if cancelled else "false",
-            "batch": (
-                "true" if self.batch_check.isChecked() else "false"
+            "batch": "true" if is_batch else "false",
+            "batch_count": str(
+                self.batch_list.rowCount() if is_batch else 1
             ),
-            "batch_count": str(self.batch_list.rowCount()),
             "batch_completed": str(counts.get("Completed", 0)),
             "batch_failed": str(counts.get("Failed", 0)),
             "batch_cancelled": str(counts.get("Cancelled", 0)),
             "error": self._notify_error_text(worker),
-            "log": "\n".join(log_lines),
         }
+        for key in (
+            "duration_seconds",
+            "file_size_bytes",
+            "video_codec",
+            "width",
+            "height",
+            "overall_bitrate",
+        ):
+            context[key] = metadata[key]
+        return context
 
     def _send_run_notification(self, code: int, cancelled: bool) -> None:
         config = self._notify_config
         if not config.enabled or not config.url.strip():
             return
+        if (
+            self.batch_check.isChecked()
+            and config.batch_mode == BATCH_NOTIFY_EACH_FILE
+            and self._batch_notified_rows
+        ):
+            return
+        self._dispatch_notification(
+            config,
+            self._run_notify_context(
+                code,
+                cancelled,
+                include_metadata=False,
+            ),
+        )
+
+    def _dispatch_notification(
+        self,
+        config: NotifyConfig,
+        context: Mapping[str, str],
+    ) -> None:
+        def path_value(key: str) -> Path | None:
+            text = str(context.get(key) or "")
+            return Path(text) if text else None
+
+        worker = _NotifyProbeWorker(
+            copy.deepcopy(config),
+            context,
+            path_value("input"),
+            path_value("output"),
+            self._notify_ffprobe(),
+        )
+        self._notify_in_flight += 1
+        self._notify_probe_jobs.add(worker)
+        worker.completed.connect(self._complete_notification)
+        worker.finished.connect(self._on_notify_probe_finished)
+        worker.start()
+
+    def _complete_notification(
+        self,
+        config: NotifyConfig,
+        context: object,
+        metadata: object,
+    ) -> None:
+        if self._notify_closing:
+            return
+        if not isinstance(context, Mapping):
+            return
+        context_values = dict(context)
+        fields = (
+            {
+                str(key): str(value)
+                for key, value in metadata.items()
+            }
+            if isinstance(metadata, Mapping)
+            else _empty_notify_metadata()
+        )
+        for key in (
+            "duration_seconds",
+            "file_size_bytes",
+            "video_codec",
+            "width",
+            "height",
+            "overall_bitrate",
+        ):
+            context_values[key] = fields.get(key, "null")
+        context_values["duration"] = fields.get(
+            "duration"
+        ) or context_values.get(
+            "duration",
+            "",
+        )
+        context_values["size"] = fields.get("size") or context_values.get(
+            "size",
+            "",
+        )
+        context_values["bitrate"] = fields.get("bitrate") or context_values.get(
+            "bitrate",
+            "",
+        )
         self._notify_client.send(
             config,
-            self._run_notify_context(code, cancelled),
+            context_values,
+            str(context_values.get("job_id") or ""),
         )
+
+    def _on_notify_probe_finished(self) -> None:
+        worker = self.sender()
+        if isinstance(worker, _NotifyProbeWorker):
+            self._notify_probe_jobs.discard(worker)
+            worker.deleteLater()
 
     def _on_worker_finished(self) -> None:
         worker = self._worker
@@ -3450,11 +4254,14 @@ class MainWindow(QMainWindow):
             worker.deleteLater()
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._notify_closing = True
         if self._worker and self._worker.isRunning():
             self._cancel_event.set()
             self._worker.wait(2000)
-        if self._notify_save_timer.isActive():
-            self._save_notify_config()
+        for worker in list(self._notify_probe_jobs):
+            worker.wait(2000)
+        self._save_notify_config()
         if self._persist_on_close:
             self._save_settings(self._settings_path)
+        self._notify_client.wait_for_finished(2000)
         event.accept()

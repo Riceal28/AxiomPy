@@ -27,7 +27,8 @@ option as raw text.
 - Editable generated script, sorting, copy/save/load, progress, cancellation and
   optional external console.
 - Optional HTTP notifications with hot-reloadable `notify.json`, custom URL,
-  headers and body, and selectable/renamable FFmpeg result fields.
+  headers and body, selectable/renamable FFmpeg result fields, and
+  enabled-parameter insertion for messages and HTTP bodies.
 - Presets, ffprobe analysis, preview, drag-and-drop input/output paths and a portable
   PyInstaller build.
 - 1280x720 default layout, adjustable 8–16 pt interface font and optional restoration
@@ -255,7 +256,7 @@ pytest -q
 
 Current validation on the development machine:
 
-- `394 passed, 9 skipped`
+- `455 passed, 9 skipped`
 - opt-in real FFmpeg conversion tests: `9 passed`, including H.264/HEVC NVENC and
   Custom CRF/bitrate/CBR cases
 - 15 native Windows screenshot pages matched at `0.0000%`

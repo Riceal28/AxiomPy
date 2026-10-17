@@ -24,7 +24,7 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
   `Cancelled` 状态，并提供当前文件进度和总进度两个进度条。
 - 生成的脚本可编辑、排序、复制、保存和加载，并支持进度、取消及可选外部控制台。
 - 可选 HTTP 通知支持热加载 `notify.json`、自定义 URL/Header/Body，并可从 FFmpeg
-  执行结果中选择、关闭或重命名通知参数。
+  执行结果中选择、关闭或重命名通知参数，也可把已启用参数插入 Message 和 HTTP Body。
 - 内置预设、ffprobe 分析、预览、输入/输出拖放以及 PyInstaller 便携版构建。
 - 默认采用 1280x720 布局，支持 8–16 pt 界面字体缩放，并可在退出时选择是否恢复
   完整工作区。
@@ -217,7 +217,7 @@ pytest -q
 
 当前开发环境的验证结果：
 
-- `394 passed, 9 skipped`
+- `455 passed, 9 skipped`
 - 可选的 FFmpeg 真实转换测试：`9 passed`，包含 H.264/HEVC NVENC 与 Custom
   CRF/码率/CBR 用例
 - 15 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`

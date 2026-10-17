@@ -272,12 +272,14 @@ class _ProgressMonitor(threading.Thread):
         interval_ms: int,
         batch_files: Sequence[Path] = (),
         ffprobe: str = "ffprobe",
+        fields_callback: Callable[[dict[str, str], str], None] | None = None,
     ) -> None:
         super().__init__(name="axiom-progress", daemon=True)
         self.plan = plan
         self.duration = duration
         self.callback = callback
         self.total_callback = total_callback
+        self.fields_callback = fields_callback
         self.interval = max(MIN_PROGRESS_INTERVAL_MS, int(interval_ms)) / 1000.0
         self.batch_files = [Path(path) for path in batch_files]
         self.ffprobe = ffprobe
@@ -364,6 +366,8 @@ class _ProgressMonitor(threading.Thread):
         if self.callback is not None and overall != self._last:
             self._last = overall
             self.callback(overall, "")
+        if self.fields_callback is not None:
+            self.fields_callback(dict(self.last_fields), "")
         return overall
 
     def _batch_progress_files(self, batch_file: Path) -> list[Path]:
@@ -390,6 +394,7 @@ class _ProgressMonitor(threading.Thread):
 
         fractions: list[float] = []
         reports_for_file: list[bool] = []
+        fields_for_file: list[dict[str, str]] = []
         for batch_file in self.batch_files:
             texts: list[str] = []
             for path in self._batch_progress_files(batch_file):
@@ -403,12 +408,14 @@ class _ProgressMonitor(threading.Thread):
                 self._duration_for(batch_file) if texts else None
             )
             pass_reports: list[tuple[float | None, bool]] = []
+            file_fields: dict[str, str] = {}
             for text in texts:
-                self.last_fields = parse_progress_fields(text)
+                file_fields = parse_progress_fields(text)
                 pass_reports.append(parse_progress_file(text, duration))
 
             has_report = bool(pass_reports)
             reports_for_file.append(has_report)
+            fields_for_file.append(file_fields)
             pass_count = max(1, self.plan.pass_count)
             if pass_reports:
                 ended = sum(1 for _, is_ended in pass_reports if is_ended)
@@ -422,9 +429,6 @@ class _ProgressMonitor(threading.Thread):
             else:
                 fraction = 0.0
             fractions.append(min(1.0, max(0.0, fraction)))
-
-            if has_report:
-                self.last_file = batch_file.name
 
         if not any(reports_for_file):
             return None
@@ -443,6 +447,7 @@ class _ProgressMonitor(threading.Thread):
             return None
         current_name = self.batch_files[current_index].name
         self.last_file = current_name
+        self.last_fields = dict(fields_for_file[current_index])
         self.last_duration = self._duration_for(
             self.batch_files[current_index]
         )
@@ -463,6 +468,11 @@ class _ProgressMonitor(threading.Thread):
             self._last = current_fraction
             self._last_file = current_name
             self.callback(current_fraction, current_name)
+        if self.fields_callback is not None:
+            self.fields_callback(
+                dict(self.last_fields),
+                current_name,
+            )
         if self.total_callback is not None and (
             total != self._last_total
             or current_name != self._last_total_file
@@ -500,6 +510,7 @@ def run(
     cancel: threading.Event | None = None,
     duration: float | None = None,
     report: RunReport | None = None,
+    on_progress_fields: Callable[[dict[str, str], str], None] | None = None,
 ) -> int:
     """Run a generated command line, streaming output and parsing ffmpeg's progress."""
     options = options or RunOptions()
@@ -520,6 +531,7 @@ def run(
         options.progress_interval_ms,
         options.batch_files,
         options.ffprobe,
+        on_progress_fields,
     )
     if plan.static_paths or (plan.batch and options.batch_files):
         monitor.start()
