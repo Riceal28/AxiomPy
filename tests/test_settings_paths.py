@@ -1,5 +1,7 @@
 """Settings path rows: automatic path display and manual Browse."""
 
+from pathlib import Path
+
 from axiom.ui.main_window import MainWindow
 
 
@@ -15,7 +17,8 @@ def test_auto_tool_path_displays_resolved_executable(qtbot, monkeypatch):
 
     label = window.path_auto_labels["Configure.FFmpegPath_Text"]
     assert not label.isHidden()
-    assert r"C:\Tools\ffmpeg.exe" in label.text()
+    shown = label.text().removeprefix("Auto: ")
+    assert Path(shown) == Path(r"C:\Tools\ffmpeg.exe")
     assert window.widgets["Configure.FFmpegPath_Text"].text() == "<auto>"
 
 
