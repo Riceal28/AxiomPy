@@ -829,19 +829,12 @@ def video_quality_controls(state: AxiomState) -> None:
 
     if quality == "Custom":
         _set(state, "Video_Pass_IsEnabled", True)
-        # Faithful to the original: the three comparisons are OR-ed, so this is always true.
-        if codec != "JPEG" or codec != "PNG" or codec != "WebP":
-            _set(state, "Video_CRF_IsEnabled", True)
-        _set(state, "Video_CRF_Text", "")
+        _set(state, "Video_CRF_IsEnabled", True)
         _set(state, "Video_BitRate_IsEnabled", True)
-        _set(state, "Video_BitRate_Text", "")
         _set(state, "Video_VBR_IsEnabled", True)
         _set(state, "Video_MinRate_IsEnabled", True)
-        _set(state, "Video_MinRate_Text", "")
         _set(state, "Video_MaxRate_IsEnabled", True)
-        _set(state, "Video_MaxRate_Text", "")
         _set(state, "Video_BufSize_IsEnabled", True)
-        _set(state, "Video_BufSize_Text", "")
         _set(state, "Video_Scale_IsEnabled", True)
         return
 

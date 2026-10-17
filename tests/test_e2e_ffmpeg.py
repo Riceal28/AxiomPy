@@ -263,3 +263,71 @@ def test_nvenc_generated_command_encodes_real_output(
         check=True,
     )
     assert probe.stdout.strip() == expected
+
+
+def test_custom_bitrate_and_rate_limits_produce_output(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "PATH",
+        str(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    source = tmp_path / "custom-br.mkv"
+    _make_source(source)
+    state = AxiomState(
+        {
+            "Main.Input_Text": str(source),
+            "Format.Format_Container_SelectedItem": "mp4",
+            "Format.Format_MediaType_SelectedItem": "Video",
+            "Video.Video_Codec_SelectedItem": "x264",
+            "Video.Video_Quality_SelectedItem": "Custom",
+            "Video.Video_Pass_SelectedItem": "1 Pass",
+            "Video.Video_BitRate_Text": "4500",
+            "Video.Video_MinRate_Text": "4000",
+            "Video.Video_MaxRate_Text": "8000",
+            "Video.Video_BufSize_Text": "9000",
+            "Video.Video_VBR_IsChecked": True,
+            "Configure.Shell_SelectedItem": "CMD",
+        }
+    )
+    script = generate_runnable(state)
+    assert "-b:v 4500K" in script
+    assert "-minrate 4000K" in script
+    assert "-maxrate 8000K" in script
+    assert "-bufsize 9000K" in script
+
+    log: list[str] = []
+    assert run(script, RunOptions(shell="CMD"), on_log=log.append) == 0, "\n".join(
+        log[-20:]
+    )
+    assert (tmp_path / "custom-br.mp4").is_file()
+
+
+def test_custom_crf_produces_output(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "PATH",
+        str(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    source = tmp_path / "custom-crf.mkv"
+    _make_source(source)
+    state = AxiomState(
+        {
+            "Main.Input_Text": str(source),
+            "Format.Format_Container_SelectedItem": "mp4",
+            "Format.Format_MediaType_SelectedItem": "Video",
+            "Video.Video_Codec_SelectedItem": "x264",
+            "Video.Video_Quality_SelectedItem": "Custom",
+            "Video.Video_Pass_SelectedItem": "CRF",
+            "Video.Video_CRF_Text": "22",
+            "Configure.Shell_SelectedItem": "CMD",
+        }
+    )
+    script = generate_runnable(state)
+    assert "-crf 22" in script
+
+    log: list[str] = []
+    assert run(script, RunOptions(shell="CMD"), on_log=log.append) == 0, "\n".join(
+        log[-20:]
+    )
+    assert (tmp_path / "custom-crf.mp4").is_file()

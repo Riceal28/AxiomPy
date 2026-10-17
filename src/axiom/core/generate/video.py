@@ -36,6 +36,24 @@ SIZE_AUTO_CODECS = {
     "WebP",
 }
 
+IMAGE_CODECS = {"JPEG", "PNG", "WebP"}
+
+
+def _rate_value(text: str) -> str:
+    """Normalize a bitrate/rate field for FFmpeg.
+
+    A bare number in Axiom's UI means kilobits per second (the field is a
+    bitrate field), so ``4500`` becomes ``4500K``.  Explicit units are kept
+    (with a normalized upper-case suffix).
+    """
+
+    value = str(text or "").strip()
+    if not value:
+        return ""
+    if re.fullmatch(r"\d+(?:\.\d+)?", value):
+        return value + "K"
+    return value.upper()
+
 
 def _row(kind: str, codec: str, section: str, name: str) -> Dict[str, Any]:
     for item in codecs.table(kind, codec, section):
@@ -480,15 +498,21 @@ def video_quality(ctx: BuildContext, pass_name: str) -> str:
         else:
             v_lossless = str(_row("video", str(codec), "quality", "Lossless").get("Lossless") or "")
     elif quality == "Custom":
-        v_crf = "-crf " + crf_text if crf_text.strip() else ""
-        v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
-        v_bitrate = bitrate_text
-        if minrate_text.strip():
-            v_minrate = "-minrate " + minrate_text.upper()
-        if maxrate_text.strip():
-            v_maxrate = "-maxrate " + maxrate_text.upper()
-        if bufsize_text.strip():
-            v_bufsize = "-bufsize " + bufsize_text.upper()
+        if codec in IMAGE_CODECS:
+            # Image encoders use the quality-scale option, not CRF/bitrate.
+            v_crf = ""
+            v_bitmode = "-q:v" if bitrate_text.strip() else ""
+            v_bitrate = bitrate_text.strip()
+        else:
+            v_crf = "-crf " + crf_text.strip() if crf_text.strip() else ""
+            v_bitmode = "-b:v" if bitrate_text.strip() else ""
+            v_bitrate = _rate_value(bitrate_text)
+            if minrate_text.strip():
+                v_minrate = "-minrate " + _rate_value(minrate_text)
+            if maxrate_text.strip():
+                v_maxrate = "-maxrate " + _rate_value(maxrate_text)
+            if bufsize_text.strip():
+                v_bufsize = "-bufsize " + _rate_value(bufsize_text)
     else:
         v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
         if minrate_text.strip():

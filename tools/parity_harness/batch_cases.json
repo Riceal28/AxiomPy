@@ -23,6 +23,7 @@
   },
   {
     "id": "bat-cmd-mp4-crf",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\",
       "Main.Batch_IsChecked": true,
@@ -52,6 +53,7 @@
   },
   {
     "id": "bat-cmd-mkv-1pass",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\",
       "Main.Batch_IsChecked": true,
@@ -101,6 +103,7 @@
   },
   {
     "id": "bat-ps-mp4-audio-auto",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\",
       "Main.Batch_IsChecked": true,

@@ -39,6 +39,10 @@ debug console, crop window, file-properties window and legacy theme/config forma
 * Selecting a preset disables the preset-owned profile controls, shows a persistent
   hint above Input/Output, explains the lock on hover, and offers an Unlock action
   that keeps the current values editable.
+* Parameter-level presets (video quality, optimization, size and audio quality) also
+  gray dependent labels/controls and contribute to the same hint.
+* Settings path rows display the resolved `<auto>` executable and provide Browse/Auto
+  controls; the Log File row has a Browse button.
 * Mouse-wheel changes on combo boxes and spin boxes are blocked by default; the
   behavior is opt-in from Settings → System.
 

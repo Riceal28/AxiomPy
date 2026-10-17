@@ -3,6 +3,31 @@
 All notable changes to AxiomPy are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] - 2026-10-17
+
+### Added
+
+- Automatic tool-path fields now display the resolved FFmpeg/FFprobe/FFplay
+  executable, with Browse and Auto buttons for manual selection.
+- The Log File setting has a Browse button.
+- Parameter-level presets (video quality, optimization, size and audio quality)
+  contribute to disabled-control tooltips and the persistent preset hint.
+
+### Changed
+
+- Custom quality now preserves user-entered values through control resolution.
+- Bare bitrate/rate-limit numbers are normalized to kilobits (`4500` becomes
+  `4500K`); image codecs use `-q:v` and video codecs use `-b:v`.
+- Custom CRF can be combined with an explicit bitrate; min/max rate and buffer
+  size are emitted with normalized units.
+
+### Fixed
+
+- Switching to Custom quality clears stale named-quality values once, while
+  later edits and parameter changes preserve them.
+- Disabled parameter rows now gray their labels as well as controls and explain
+  the controlling preset or mode on hover.
+
 ## [0.2.2] - 2026-10-17
 
 ### Added

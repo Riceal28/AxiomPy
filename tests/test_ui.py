@@ -92,7 +92,8 @@ def test_preset_locks_identity_controls_with_hover_reason(qtbot):
     assert codec.isEnabled()
     assert container_label.isEnabled()
     assert window.preset_unlock_button.isHidden()
-    assert window.preset_hint.isHidden()
+    assert not window.preset_hint.isHidden()
+    assert "Active parameter presets" in window.preset_hint.text()
 
     window.preset_combo.setCurrentText("Preset")
     assert container.isEnabled()
@@ -135,6 +136,45 @@ def test_mouse_wheel_adjustment_is_opt_in_and_persisted(qtbot, tmp_path):
     assert restored._wheel_guard.enabled is True
 
 
+def test_parameter_presets_gray_and_explain_dependent_controls(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.widgets["Format.Format_Container_SelectedItem"].setCurrentText("mp4")
+
+    quality = window.widgets["Video.Video_Quality_SelectedItem"]
+    crf = window.widgets["Video.Video_CRF_Text"]
+    quality.setCurrentText("High")
+    assert not crf.isEnabled()
+    assert "video quality preset 'High'" in crf.toolTip()
+    assert not window.widget_labels["Video.Video_CRF_Text"].isEnabled()
+    assert "video quality 'High'" in window.preset_hint.text()
+
+    quality.setCurrentText("Custom")
+    assert crf.isEnabled()
+    window.widgets["Video.Video_Optimize_SelectedItem"].setCurrentText("None")
+    assert window.preset_hint.isHidden()
+
+    optimize = window.widgets["Video.Video_Optimize_SelectedItem"]
+    tune = window.widgets["Video.Video_Optimize_Tune_SelectedItem"]
+    optimize.setCurrentText("PC HD")
+    assert not tune.isEnabled()
+    assert "optimization preset 'PC HD'" in tune.toolTip()
+    assert "optimization 'PC HD'" in window.preset_hint.text()
+
+    scale = window.widgets["Video.Video_Scale_SelectedItem"]
+    width = window.widgets["Video.Video_Width_Text"]
+    scale.setCurrentText("1080p")
+    assert not width.isEnabled()
+    assert "size preset '1080p'" in width.toolTip()
+    assert "size '1080p'" in window.preset_hint.text()
+
+    audio_quality = window.widgets["Audio.Audio_Quality_SelectedItem"]
+    audio_bitrate = window.widgets["Audio.Audio_BitRate_Text"]
+    audio_quality.setCurrentText("192")
+    assert not audio_bitrate.isEnabled()
+    assert "audio quality preset '192'" in audio_bitrate.toolTip()
+
+
 def test_scale_controls_follow_custom_and_source(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
@@ -163,6 +203,28 @@ def test_quality_change_keeps_selected_video_codec(qtbot):
 
     assert codec.currentText() == original
     assert "-c:v libx264" in window._generated_text
+
+
+def test_custom_quality_clears_named_values_once_and_keeps_edits(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.widgets["Format.Format_Container_SelectedItem"].setCurrentText("mp4")
+    quality = window.widgets["Video.Video_Quality_SelectedItem"]
+    bitrate = window.widgets["Video.Video_BitRate_Text"]
+    crf = window.widgets["Video.Video_CRF_Text"]
+    pass_mode = window.widgets["Video.Video_Pass_SelectedItem"]
+
+    quality.setCurrentText("High")
+    assert crf.text() == "20"
+
+    quality.setCurrentText("Custom")
+    assert bitrate.text() == ""
+    assert crf.text() == ""
+
+    bitrate.setText("4500")
+    pass_mode.setCurrentText("1 Pass")
+    assert bitrate.text() == "4500"
+    assert "-b:v 4500K" in window._generated_text
 
 
 def test_batch_queue_lists_matching_files(qtbot, tmp_path):

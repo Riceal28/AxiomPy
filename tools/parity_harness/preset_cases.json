@@ -815,6 +815,7 @@
   },
   {
     "id": "prs-uhd",
+    "expectedOverride": "custom-rate-control",
     "preset": "UHD",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",
@@ -859,6 +860,7 @@
   },
   {
     "id": "prs-dvd",
+    "expectedOverride": "custom-rate-control",
     "preset": "DVD",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",

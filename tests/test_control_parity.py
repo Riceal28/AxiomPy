@@ -37,6 +37,14 @@ SETTINGS_RUNTIME_KEYS = {
     "Configure.OutputNaming_ListView_Items",
 }
 
+CUSTOM_RATE_KEYS = {
+    "Video.Video_CRF_Text",
+    "Video.Video_BitRate_Text",
+    "Video.Video_MinRate_Text",
+    "Video.Video_MaxRate_Text",
+    "Video.Video_BufSize_Text",
+}
+
 
 def cases():
     result: list[dict] = []
@@ -62,7 +70,12 @@ def test_codec_layer_state_matches_oracle(case):
     mismatches = {
         key: (expected.get(key), actual.get(key))
         for key in expected
-        if key not in SETTINGS_RUNTIME_KEYS and actual.get(key) != expected.get(key)
+        if key not in SETTINGS_RUNTIME_KEYS
+        and not (
+            case.get("expectedOverride") == "custom-rate-control"
+            and key in CUSTOM_RATE_KEYS
+        )
+        and actual.get(key) != expected.get(key)
     }
     assert not mismatches, f"control layer differs from the oracle: {mismatches}"
 

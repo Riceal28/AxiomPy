@@ -32,6 +32,10 @@ option as raw text.
   of the complete workspace on exit.
 - Preset-owned values are grayed out with a visible hint, hover explanations and an
   **Unlock** button that keeps the current values while allowing edits.
+- Parameter-level presets such as video quality, optimization, size and audio
+  quality also gray their dependent controls and explain themselves on hover.
+- Custom quality supports explicit CRF, bitrate, min/max rate and buffer size;
+  bare rate numbers are normalized to kilobits.
 - Mouse-wheel value adjustment is available as an opt-in setting and is disabled by
   default to prevent accidental parameter changes.
 
@@ -111,6 +115,22 @@ quality, stream selection and hardware path). Locked controls are disabled and s
 the reason on hover; click **Unlock** to keep those values and edit them, or choose
 `Preset` to return to manual defaults.
 
+Parameter presets are treated separately from the Input/Output preset list. For
+example, **Video → Encoding → Quality = High** manages CRF/bitrate/VBR fields,
+**Optimize = Web** manages tune/profile/level, **Size = 1080p** manages width/height,
+and **Audio → Quality = 192** manages the audio bitrate. Grayed labels and controls
+explain these dependencies on hover.
+
+### Custom quality
+
+When **Quality** is `Custom`:
+
+- Bare numbers in bitrate/min/max/buffer fields are treated as kilobits
+  (`4500` → `4500K`).
+- Video codecs use `-b:v`; image codecs use `-q:v`.
+- CRF and an explicit bitrate can be combined.
+- Values are preserved when pass, VBR or other controls are changed.
+
 ### Hardware acceleration
 
 Set **Video → Encoding → Hardware Acceleration** to `On` to expose hardware codec
@@ -142,6 +162,10 @@ Open **Settings → System** to configure:
 
 The default window size is 1280x720. A restored workspace takes precedence over the
 default size.
+
+In **Settings → Config**, FFmpeg, FFprobe and FFplay rows show the path resolved by
+`<auto>` underneath the field. Use **Browse…** for a manual executable, or **Auto** to
+return to the bundled/`PATH` lookup. The Log File row also has **Browse…**.
 
 ![AxiomPy interface settings](docs/images/settings.png)
 
@@ -189,8 +213,9 @@ pytest -q
 
 Current validation on the development machine:
 
-- `349 passed, 4 skipped`
-- opt-in real FFmpeg conversion tests: `4 passed`, including H.264 and HEVC NVENC
+- `358 passed, 6 skipped`
+- opt-in real FFmpeg conversion tests: `6 passed`, including H.264/HEVC NVENC and
+  Custom CRF/bitrate cases
 - 13 native Windows screenshot pages matched at `0.0000%`
 
 ### Parity harness

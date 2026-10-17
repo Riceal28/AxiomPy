@@ -29,6 +29,10 @@ QLabel#presetHint {
     color: #d5b46a;
     padding: 3px 4px 1px 4px;
 }
+QLabel#autoPathHint {
+    color: #8f959d;
+    padding-left: 4px;
+}
 QTabBar::tab {
     background: #2b2e33;
     color: #c9c9c9;

@@ -287,6 +287,7 @@
   },
   {
     "id": "ctl-mp4-custom",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",
       "Format.Format_Container_SelectedItem": "mp4",
@@ -570,6 +571,7 @@
   },
   {
     "id": "ctl-mp4-x264-2pass",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",
       "Format.Format_Container_SelectedItem": "mp4",
@@ -586,6 +588,7 @@
   },
   {
     "id": "ctl-mp4-x264-crf-custom",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",
       "Format.Format_Container_SelectedItem": "mp4",

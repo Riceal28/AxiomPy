@@ -15,6 +15,11 @@ from axiom.core.cli import generate_command, load_cases
 from axiom.core.generate import PENDING_MODULES
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
+CUSTOM_RATE_GOLDENS = json.loads(
+    (Path(__file__).parent / "custom_rate_goldens.json").read_text(
+        encoding="utf-8"
+    )
+)
 CASE_FILES = [
     Path(__file__).parent.parent / "tools" / "parity_harness" / "smoke_cases.json",
     Path(__file__).parent.parent / "tools" / "parity_harness" / "control_cases.json",
@@ -48,6 +53,8 @@ def test_python_matches_csharp_oracle(case):
     except NotImplementedError:
         pytest.skip("generator still being ported: " + ", ".join(PENDING_MODULES))
     expected_args = expected["args"]
+    if case.get("expectedOverride") == "custom-rate-control":
+        expected_args = CUSTOM_RATE_GOLDENS[case["id"]]
     if case.get("expectedOverride") == "amf-qvbr":
         # Deliberate correction: generic -crf is not an AMF encoder option.
         # The C# oracle still emits it, so transform the captured expectation.

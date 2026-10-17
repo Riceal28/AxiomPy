@@ -28,6 +28,10 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
   完整工作区。
 - 选择预设后，预设固定的参数会灰显，并显示可见提示；鼠标悬停可查看原因，
   点击 **Unlock** 可保留当前值并解锁编辑。
+- 视频质量、优化、尺寸、音频质量等参数级预设也会让相关参数灰显，并在悬停时
+  说明当前控制它们的预设。
+- Quality 为 Custom 时支持 CRF、码率、最小/最大码率和缓冲区大小，纯数字码率
+  会自动按 kbps 处理。
 - 鼠标滚轮调参作为可选项提供，默认关闭，避免误改参数。
 
 ## 系统要求
@@ -102,6 +106,20 @@ Input/Output 是独立面板。Script 与 Log 停靠窗口可调整大小，其�
 固定的容器、编解码器、质量、流选择和硬件路径会锁定；锁定控件会灰显并在悬停时
 说明原因。点击 **Unlock** 可保留当前值并编辑，或选择 `Preset` 回到手动默认值。
 
+参数配置中的预设会单独识别。例如 **Video → Encoding → Quality = High** 会管理
+CRF/码率/VBR，**Optimize = Web** 管理 tune/profile/level，**Size = 1080p**
+管理宽高，**Audio → Quality = 192** 管理音频码率。灰显标签和控件会在悬停时说明
+依赖关系。
+
+### Custom 质量
+
+当 **Quality** 选择 `Custom` 时：
+
+- 码率、最小/最大码率和缓冲区中的纯数字按 kbps 处理（`4500` → `4500K`）。
+- 视频编码器使用 `-b:v`，图片编码器使用 `-q:v`。
+- CRF 可以与显式码率同时使用。
+- 修改 Pass、VBR 或其他控件时不会清空已填写的参数。
+
 ### 硬件加速
 
 将 **Video → Encoding → Hardware Acceleration** 设置为 `On` 后，可选择硬件编码器。
@@ -132,6 +150,10 @@ Settings → FFmpeg 中指定兼容的自定义 FFmpeg。
   和数值框。
 
 默认窗口大小为 1280x720；如果存在已保存的工作区，则优先使用工作区中的尺寸。
+
+在 **Settings → Config** 中，FFmpeg、FFprobe 和 FFplay 的 `<auto>` 字段下方会显示
+实际解析到的路径。使用 **Browse…** 手动选择可执行文件，或点击 **Auto** 恢复
+内置/`PATH` 查找。Log File 也提供 **Browse…** 按钮。
 
 ![AxiomPy 界面设置](docs/images/settings.png)
 
@@ -175,8 +197,9 @@ pytest -q
 
 当前开发环境的验证结果：
 
-- `349 passed, 4 skipped`
-- 可选的 FFmpeg 真实转换测试：`4 passed`，包含 H.264 与 HEVC NVENC
+- `358 passed, 6 skipped`
+- 可选的 FFmpeg 真实转换测试：`6 passed`，包含 H.264/HEVC NVENC 与 Custom
+  CRF/码率用例
 - 13 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`
 
 ### 一致性测试工具

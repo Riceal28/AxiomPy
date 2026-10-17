@@ -57,9 +57,16 @@ from axiom.core.runner import (
 )
 from axiom.core.script import Script
 from axiom.core.state import AxiomState
+from axiom.core.toolpaths import resolve_tool_path
 
 from .control_rules import enabled_key, structural_scope
-from .preset_locks import PRESET_LOCKED_KEYS, preset_lock_reason
+from .preset_locks import (
+    PARAMETER_PRESET_KEYS,
+    PRESET_LOCKED_KEYS,
+    active_parameter_presets,
+    parameter_preset_reason,
+    preset_lock_reason,
+)
 
 
 SELECTIVE_COLORS = (
@@ -193,6 +200,10 @@ class MainWindow(QMainWindow):
         self.presets = PresetStore()
         self.widgets: dict[str, QWidget] = {}
         self.widget_labels: dict[str, QWidget] = {}
+        self.path_auto_labels: dict[str, QLabel] = {}
+        self.path_browse_buttons: dict[str, QPushButton] = {}
+        self.path_auto_buttons: dict[str, QPushButton] = {}
+        self.path_tools: dict[str, str] = {}
         self.combo_items: dict[str, str] = {}
         self._loading = False
         self._updating_script = False
@@ -210,6 +221,8 @@ class MainWindow(QMainWindow):
         self._save_workspace_on_exit = True
         self._mouse_wheel_adjust = False
         self._preset_locked = False
+        self._initial_parameter_presets: frozenset[str] = frozenset()
+        self._initial_parameter_values: dict[str, object] = {}
         self._settings_path: Path | None = None
         self._persist_on_close = False
         self._wheel_guard = _WheelGuard(self)
@@ -226,6 +239,13 @@ class MainWindow(QMainWindow):
         self._refresh_controls(full=True)
         self.state.set("Audio.Audio_Stream_SelectedItem", "all")
         self._populate_widgets()
+        self._initial_parameter_presets = frozenset(
+            active_parameter_presets(self.state)
+        )
+        self._initial_parameter_values = {
+            key: self.state.get(key) for key in PARAMETER_PRESET_KEYS
+        }
+        self._apply_preset_locks()
         self._regenerate(force=True)
 
     # -- construction -----------------------------------------------------
@@ -249,6 +269,7 @@ class MainWindow(QMainWindow):
         self._base_tooltips = {
             key: widget.toolTip() for key, widget in self.widgets.items()
         }
+        self._refresh_auto_path_labels()
 
         refresh = QAction("Regenerate Script", self)
         refresh.setShortcut("F5")
@@ -586,6 +607,122 @@ class MainWindow(QMainWindow):
         if label_widget is not None:
             self.widget_labels[key] = label_widget
         return spin
+
+    def _add_path_setting(
+        self,
+        form: QFormLayout,
+        label: str,
+        key: str,
+        *,
+        tool: str,
+        auto: bool = True,
+        save: bool = False,
+    ) -> QLineEdit:
+        holder = QWidget(self)
+        holder_layout = QVBoxLayout(holder)
+        holder_layout.setContentsMargins(0, 0, 0, 0)
+        holder_layout.setSpacing(2)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        edit = QLineEdit(self)
+        edit.textChanged.connect(
+            lambda value, k=key: self._on_state_value(k, value)
+        )
+        row.addWidget(edit, 1)
+
+        browse = QPushButton("Browse…", self)
+        browse.setToolTip(
+            "Select a log file" if save else f"Select the {label} executable"
+        )
+        browse.clicked.connect(
+            lambda: self._browse_setting_path(key, tool, save)
+        )
+        row.addWidget(browse)
+
+        auto_button = None
+        auto_label = None
+        if auto:
+            auto_button = QPushButton("Auto", self)
+            auto_button.setToolTip(
+                "Use the bundled installation, AXIOM_FFMPEG_BIN, or PATH."
+            )
+            auto_button.clicked.connect(
+                lambda _checked=False, k=key: self.widgets[k].setText("<auto>")
+            )
+            row.addWidget(auto_button)
+
+        holder_layout.addLayout(row)
+        if auto:
+            auto_label = QLabel("", self)
+            auto_label.setObjectName("autoPathHint")
+            auto_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            auto_label.hide()
+            holder_layout.addWidget(auto_label)
+
+        form.addRow(label, holder)
+        self.widgets[key] = edit
+        self.path_browse_buttons[key] = browse
+        self.path_tools[key] = tool
+        if auto_button is not None:
+            self.path_auto_buttons[key] = auto_button
+        if auto_label is not None:
+            self.path_auto_labels[key] = auto_label
+        label_widget = form.labelForField(holder)
+        if label_widget is not None:
+            self.widget_labels[key] = label_widget
+        return edit
+
+    def _browse_setting_path(
+        self,
+        key: str,
+        tool: str,
+        save: bool,
+    ) -> None:
+        edit = self.widgets[key]
+        current = edit.text().strip()
+        if save:
+            start = current if current and current != "<auto>" else ""
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Select Log File",
+                start,
+                "Log files (*.log *.txt);;All files (*)",
+            )
+        else:
+            start = ""
+            if current and current != "<auto>":
+                start = str(Path(current).parent)
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                f"Select {tool or 'file'}",
+                start,
+                "Executables (*.exe);;All files (*)",
+            )
+        if path:
+            edit.setText(path)
+
+    def _refresh_auto_path_labels(self) -> None:
+        for key, label in self.path_auto_labels.items():
+            value = str(self.state.get(key) or "")
+            edit = self.widgets.get(key)
+            if value.strip() not in ("", "<auto>"):
+                label.hide()
+                if edit is not None:
+                    edit.setToolTip("")
+                continue
+
+            resolved = resolve_tool_path(value or "<auto>", self.path_tools[key])
+            text = (
+                f"Auto: {resolved}"
+                if resolved is not None
+                else "Auto: not found (set AXIOM_FFMPEG_BIN or add it to PATH)"
+            )
+            label.setText(text)
+            label.setToolTip(text)
+            label.show()
+            if edit is not None:
+                edit.setToolTip(text)
 
     def _build_format_tab(self) -> QWidget:
         page, form = self._page()
@@ -1081,9 +1218,15 @@ class MainWindow(QMainWindow):
         self.settings_tabs = tabs
 
         config, form = self._scroll_form()
-        self._add_edit(form, "FFmpeg", "Configure.FFmpegPath_Text")
-        self._add_edit(form, "FFprobe", "Configure.FFprobePath_Text")
-        self._add_edit(form, "FFplay", "Configure.FFplayPath_Text")
+        self._add_path_setting(
+            form, "FFmpeg", "Configure.FFmpegPath_Text", tool="ffmpeg"
+        )
+        self._add_path_setting(
+            form, "FFprobe", "Configure.FFprobePath_Text", tool="ffprobe"
+        )
+        self._add_path_setting(
+            form, "FFplay", "Configure.FFplayPath_Text", tool="ffplay"
+        )
         self._add_combo(
             form,
             "Shell",
@@ -1124,7 +1267,14 @@ class MainWindow(QMainWindow):
             "Write Log",
             "Configure.LogCheckBox_IsChecked",
         )
-        self._add_edit(form, "Log File", "Configure.LogPath_Text")
+        self._add_path_setting(
+            form,
+            "Log File",
+            "Configure.LogPath_Text",
+            tool="",
+            auto=False,
+            save=True,
+        )
         tabs.addTab(config, "Config")
 
         files, form = self._scroll_form()
@@ -1260,6 +1410,7 @@ class MainWindow(QMainWindow):
                 item.setCheckState(
                     Qt.Checked if item.text() in selected else Qt.Unchecked
                 )
+            self._refresh_auto_path_labels()
             self._sync_widget_states()
         finally:
             self._loading = False
@@ -1278,6 +1429,8 @@ class MainWindow(QMainWindow):
         # rules below (and the preset overlay) decide the final state.
         for widget in self.widgets.values():
             widget.setEnabled(True)
+        for label in self.widget_labels.values():
+            label.setEnabled(True)
         auto_sort = bool(self.state.get("Main.AutoSortScript_IsChecked"))
         if self.auto_sort_check.isChecked() != auto_sort:
             self.auto_sort_check.blockSignals(True)
@@ -1357,12 +1510,33 @@ class MainWindow(QMainWindow):
             self._preset_locked
             and preset_name not in ("", "Preset")
         )
+        parameter_presets = active_parameter_presets(self.state)
         self.preset_unlock_button.setVisible(locked)
         if locked:
             self.preset_hint.setText(
                 f"Preset '{preset_name}' fixes the grayed values. "
                 "Hover over a grayed control for the reason, or click Unlock "
                 "to edit the current values."
+                + (
+                    " Active parameter presets: "
+                    + ", ".join(parameter_presets)
+                    + "."
+                    if parameter_presets
+                    else ""
+                )
+            )
+            self.preset_hint.show()
+        elif (
+            parameter_presets
+            and any(
+                self.state.get(key) != self._initial_parameter_values.get(key)
+                for key in PARAMETER_PRESET_KEYS
+            )
+        ):
+            self.preset_hint.setText(
+                "Active parameter presets: "
+                + ", ".join(parameter_presets)
+                + ". Grayed fields show the reason on hover."
             )
             self.preset_hint.show()
         else:
@@ -1370,17 +1544,24 @@ class MainWindow(QMainWindow):
         for key, widget in self.widgets.items():
             base = self._base_tooltips.get(key, "")
             label = self.widget_labels.get(key)
+            reason = None
             if locked and key in PRESET_LOCKED_KEYS:
                 reason = preset_lock_reason(key, preset_name)
                 widget.setEnabled(False)
-                widget.setToolTip(reason)
                 widget.setProperty("presetLocked", True)
+            elif not widget.isEnabled():
+                reason = parameter_preset_reason(self.state, key)
+
+            if reason:
+                widget.setToolTip(reason)
+                widget.setProperty("axiomHint", True)
                 if label is not None:
                     label.setEnabled(False)
                     label.setToolTip(reason)
-            elif widget.property("presetLocked"):
+            elif widget.property("axiomHint") or widget.property("presetLocked"):
                 widget.setToolTip(base)
                 widget.setProperty("presetLocked", False)
+                widget.setProperty("axiomHint", False)
                 if label is not None:
                     label.setEnabled(True)
                     label.setToolTip("")
@@ -1394,7 +1575,20 @@ class MainWindow(QMainWindow):
     def _on_state_value(self, key: str, value, structural: bool = False) -> None:
         if self._loading:
             return
+        previous = self.state.get(key)
         self.state.set(key, value)
+        if key in self.path_tools:
+            self._refresh_auto_path_labels()
+        if (
+            key == "Video.Video_Quality_SelectedItem"
+            and value == "Custom"
+            and previous != "Custom"
+        ):
+            # Entering Custom from a named quality should not inherit that
+            # quality's generated rates.  Preset/workspace application bypasses
+            # this path and keeps its explicit values.
+            for field in ("CRF", "BitRate", "MinRate", "MaxRate", "BufSize"):
+                self.state.set(f"Video.Video_{field}_Text", "")
         if structural:
             self._apply_structural_change(key)
             self._populate_widgets()
@@ -2207,6 +2401,7 @@ class MainWindow(QMainWindow):
         for key, value in settings.values.items():
             if key in self.state.values:
                 self.state.set(key, value)
+        self._refresh_auto_path_labels()
         self._script_sorted = bool(
             self.state.get("Main.AutoSortScript_IsChecked")
         )

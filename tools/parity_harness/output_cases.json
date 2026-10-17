@@ -68,6 +68,7 @@
   },
   {
     "id": "out-tokens-custom-output",
+    "expectedOverride": "custom-rate-control",
     "state": {
       "Main.Input_Text": "C:\\Input\\My Video.mov",
       "Main.Output_Text": "C:\\Output\\",
