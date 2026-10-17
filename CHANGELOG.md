@@ -37,6 +37,8 @@ All notable changes to AxiomPy are recorded here. This project follows
 - Custom CRF is no longer silently dropped, and VBR is no longer ignored.
 - CRF is disabled outside the CRF pass with an explanatory tooltip; VBR is
   disabled in CRF mode because CRF is variable bitrate by definition.
+- Test dependencies pin pytest 8.x/pytest-qt 4.x to avoid Windows CI
+  temporary-directory failures.
 - Disabled parameter rows now gray their labels as well as controls and explain
   the controlling preset or mode on hover.
 
