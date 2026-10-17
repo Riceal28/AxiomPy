@@ -125,10 +125,27 @@ explain these dependencies on hover.
 
 When **Quality** is `Custom`:
 
+- Selecting Custom starts on the `CRF` pass, so the CRF field is usable
+  immediately.
 - Bare numbers in bitrate/min/max/buffer fields are treated as kilobits
   (`4500` → `4500K`).
-- Video codecs use `-b:v`; image codecs use `-q:v`.
-- CRF and an explicit bitrate can be combined.
+- In the `CRF` pass, CRF sets the quality target and Bitrate is preserved as
+  `-b:v`. Bitrate alone does not synthesize Max Rate or Buffer Size. x264/x265
+  still prioritize CRF, so use Max Rate when you need a VBV cap.
+- Max Rate is emitted only from the Max Rate field. When both Bitrate and Max
+  Rate are set, Max Rate is clamped up to Bitrate if it is lower. A Max Rate
+  without an explicit Buffer Size gets a default buffer of twice the cap.
+- In `1 Pass` / `2 Pass`, Bitrate drives the encode. VBR checked uses average
+  variable bitrate (`-b:v`); VBR unchecked uses CBR defaults
+  (`-minrate`/`-maxrate` equal to Bitrate and a buffer of twice the rate) unless
+  you provide your own limits.
+- In CRF mode, a supplied Max Rate plus its buffer act as VBV limits. Min Rate
+  applies to 1-pass/2-pass VBR/CBR and is disabled on the CRF pass because CRF
+  has no minimum-bitrate target. These limits also reach NVENC/AMF/QSV quality
+  arguments where the encoder supports them.
+- `2 Pass` remains bitrate-based and ignores CRF, which FFmpeg cannot combine
+  with two-pass encoding.
+- Image codecs use `-q:v` for the Custom quality value.
 - Values are preserved when pass, VBR or other controls are changed.
 
 ### Hardware acceleration

@@ -161,6 +161,25 @@ def parameter_preset_reason(state: Any, key: str) -> str | None:
         if codec in ("None", "Copy"):
             return f"Video encoding is disabled by codec '{codec}'."
         quality = state.get("Video.Video_Quality_SelectedItem")
+        selected_pass = state.get("Video.Video_Pass_SelectedItem")
+        if quality == "Custom" and key == "Video.Video_CRF_Text":
+            if selected_pass != "CRF":
+                return (
+                    "CRF is only used by the CRF encoding pass. "
+                    "Select Pass = CRF to enter a quality target."
+                )
+        if quality == "Custom" and key == "Video.Video_VBR_IsChecked":
+            if selected_pass == "CRF":
+                return (
+                    "CRF is variable bitrate by definition. "
+                    "Select 1 Pass or 2 Pass to choose VBR or CBR explicitly."
+                )
+        if quality == "Custom" and key == "Video.Video_MinRate_Text":
+            if selected_pass == "CRF":
+                return (
+                    "CRF has no minimum-bitrate target. "
+                    "Select 1 Pass or 2 Pass to use CBR rate limits."
+                )
         if quality:
             return f"Managed by video quality preset '{quality}'."
     if key in VIDEO_OPTIMIZE_MANAGED:

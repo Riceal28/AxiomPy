@@ -105,3 +105,68 @@ def test_nvenc_uses_original_quality_arguments():
     command = _hardware_command("H264 NVENC", "NVIDIA NVENC")
     assert "-c:v h264_nvenc" in command
     assert "-rc:v vbr_hq -crf 20" in command
+
+
+def _hardware_custom_command(codec: str, vendor: str) -> str:
+    state = _mp4_state()
+    controls.resolve(state)
+    state.set("Video.Video_HWAccel_SelectedItem", "On")
+    controls.hwaccel_mode_controls(state)
+    state.set("Video.Video_HWAccel_Transcode_SelectedItem", vendor)
+    controls.select_hwaccel_video_codec(state)
+    state.set("Video.Video_Codec_SelectedItem", codec)
+    controls.change_hwaccel_transcode(state)
+    controls.codec_controls(state, "video", codec)
+    state.set("Video.Video_Quality_SelectedItem", "Custom")
+    state.set("Video.Video_Pass_SelectedItem", "CRF")
+    state.set("Video.Video_CRF_Text", "22")
+    state.set("Video.Video_BitRate_Text", "4000")
+    state.set("Video.Video_MinRate_Text", "3500")
+    state.set("Video.Video_MaxRate_Text", "8000")
+    state.set("Video.Video_BufSize_Text", "9000")
+    controls.encoding_pass_controls(state)
+    controls.video_quality_controls(state)
+    controls.video_bitrate_display(state)
+    return generate(state)
+
+
+def test_custom_hardware_quality_keeps_rate_limits_effective():
+    nvenc = _hardware_custom_command("H264 NVENC", "NVIDIA NVENC")
+    assert "-rc:v vbr_hq -crf 22" in nvenc
+    assert "-b:v 4000K" in nvenc
+    assert "-minrate" not in nvenc
+    assert "-maxrate 8000K" in nvenc
+    assert "-bufsize 9000K" in nvenc
+
+    amf = _hardware_custom_command("H264 AMF", "AMD AMF")
+    assert "-rc qvbr -qvbr_quality_level 22" in amf
+    assert "-b:v 4000K" in amf
+    assert "-maxrate 8000K" in amf
+    assert "-bufsize 9000K" in amf
+
+    qsv = _hardware_custom_command("H264 QSV", "Intel QSV")
+    assert "-global_quality 22 -look_ahead 1" in qsv
+    assert "-b:v 4000K" in qsv
+    assert "-maxrate 8000K" in qsv
+    assert "-bufsize 9000K" in qsv
+
+
+def test_custom_hardware_bitrate_mode_ignores_stale_crf():
+    state = _mp4_state()
+    controls.resolve(state)
+    state.set("Video.Video_HWAccel_SelectedItem", "On")
+    controls.hwaccel_mode_controls(state)
+    state.set("Video.Video_HWAccel_Transcode_SelectedItem", "NVIDIA NVENC")
+    controls.select_hwaccel_video_codec(state)
+    controls.codec_controls(state, "video", "H264 NVENC")
+    state.set("Video.Video_Quality_SelectedItem", "Custom")
+    state.set("Video.Video_Pass_SelectedItem", "1 Pass")
+    state.set("Video.Video_CRF_Text", "22")
+    state.set("Video.Video_BitRate_Text", "4000")
+    state.set("Video.Video_VBR_IsChecked", True)
+    controls.video_quality_controls(state)
+
+    command = generate(state)
+    assert "-c:v h264_nvenc" in command
+    assert "-b:v 4000K" in command
+    assert "-crf" not in command

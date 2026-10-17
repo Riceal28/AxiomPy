@@ -1579,11 +1579,12 @@ class MainWindow(QMainWindow):
         self.state.set(key, value)
         if key in self.path_tools:
             self._refresh_auto_path_labels()
-        if (
+        entering_custom = (
             key == "Video.Video_Quality_SelectedItem"
             and value == "Custom"
             and previous != "Custom"
-        ):
+        )
+        if entering_custom:
             # Entering Custom from a named quality should not inherit that
             # quality's generated rates.  Preset/workspace application bypasses
             # this path and keeps its explicit values.
@@ -1591,6 +1592,15 @@ class MainWindow(QMainWindow):
                 self.state.set(f"Video.Video_{field}_Text", "")
         if structural:
             self._apply_structural_change(key)
+            if entering_custom:
+                # Match the original Axiom flow: Custom quality starts on the
+                # CRF pass so the CRF field is usable immediately.  The pass
+                # list is rebuilt by the structural change above.
+                if "CRF" in _names(self.state.get("Video.Video_Pass_Items")):
+                    self.state.set("Video.Video_Pass_SelectedItem", "CRF")
+                    controls.encoding_pass_controls(self.state)
+                    controls.video_quality_controls(self.state)
+                    controls.video_bitrate_display(self.state)
             self._populate_widgets()
         self._regenerate()
 

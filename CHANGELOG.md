@@ -18,13 +18,23 @@ All notable changes to AxiomPy are recorded here. This project follows
 - Custom quality now preserves user-entered values through control resolution.
 - Bare bitrate/rate-limit numbers are normalized to kilobits (`4500` becomes
   `4500K`); image codecs use `-q:v` and video codecs use `-b:v`.
-- Custom CRF can be combined with an explicit bitrate; min/max rate and buffer
-  size are emitted with normalized units.
+- Selecting Custom starts on the CRF pass. Bitrate is preserved as `-b:v` and
+  no longer synthesizes Max Rate/Buffer Size by itself. A supplied Max Rate is
+  clamped to at least Bitrate and gets a default buffer when Buffer Size is
+  empty.
+- In 1-pass/2-pass Custom mode, VBR checked uses average bitrate; VBR unchecked
+  now emits real CBR defaults (`-minrate`/`-maxrate` plus a buffer) when no
+  explicit limits are supplied.
+- Custom max-rate/buffer limits now reach software and NVENC/AMF/QSV commands;
+  min-rate is used in bitrate modes, where the encoders honor it.
 
 ### Fixed
 
 - Switching to Custom quality clears stale named-quality values once, while
   later edits and parameter changes preserve them.
+- Custom CRF is no longer silently dropped, and VBR is no longer ignored.
+- CRF is disabled outside the CRF pass with an explanatory tooltip; VBR is
+  disabled in CRF mode because CRF is variable bitrate by definition.
 - Disabled parameter rows now gray their labels as well as controls and explain
   the controlling preset or mode on hover.
 

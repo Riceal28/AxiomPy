@@ -829,10 +829,20 @@ def video_quality_controls(state: AxiomState) -> None:
 
     if quality == "Custom":
         _set(state, "Video_Pass_IsEnabled", True)
-        _set(state, "Video_CRF_IsEnabled", True)
+        selected_pass = state.get("Video.Video_Pass_SelectedItem")
+        is_image = codec in ("JPEG", "PNG", "WebP")
+        # CRF and bitrate are separate rate-control modes.  Custom starts on
+        # the CRF pass (the UI does this when the user selects Custom), while
+        # explicit VBR/CBR belongs to the 1/2-pass bitrate modes.
+        _set(state, "Video_CRF_IsEnabled", selected_pass == "CRF")
         _set(state, "Video_BitRate_IsEnabled", True)
-        _set(state, "Video_VBR_IsEnabled", True)
-        _set(state, "Video_MinRate_IsEnabled", True)
+        _set(
+            state,
+            "Video_VBR_IsEnabled",
+            not is_image and selected_pass in ("1 Pass", "2 Pass"),
+        )
+        # CRF has no minimum-bitrate target; encoders ignore -minrate there.
+        _set(state, "Video_MinRate_IsEnabled", selected_pass != "CRF")
         _set(state, "Video_MaxRate_IsEnabled", True)
         _set(state, "Video_BufSize_IsEnabled", True)
         _set(state, "Video_Scale_IsEnabled", True)

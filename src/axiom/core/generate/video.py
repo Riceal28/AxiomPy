@@ -55,6 +55,59 @@ def _rate_value(text: str) -> str:
     return value.upper()
 
 
+def _double_rate(text: str) -> str:
+    """Return a doubled bitrate while keeping the UI's K/M unit."""
+
+    value = _rate_value(text)
+    match = re.fullmatch(r"(\d+(?:\.\d+)?)([KM])", value)
+    if not match:
+        return value
+    number = float(match.group(1)) * 2
+    return f"{number:.3f}".rstrip("0").rstrip(".") + match.group(2)
+
+
+def _rate_number(text: str) -> float | None:
+    """Parse a normalized rate string into bits per second."""
+
+    value = _rate_value(text)
+    match = re.fullmatch(r"(\d+(?:\.\d+)?)([KM])?", value)
+    if not match:
+        return None
+    multiplier = 1_000_000 if match.group(2) == "M" else 1_000
+    return float(match.group(1)) * multiplier
+
+
+def _clamp_maxrate(bitrate: str, maxrate: str) -> str:
+    """A Max Rate below the target Bitrate cannot be satisfied."""
+
+    target = _rate_number(bitrate)
+    cap = _rate_number(maxrate)
+    if target is not None and cap is not None and cap < target:
+        return _rate_value(bitrate)
+    return maxrate
+
+
+def _custom_vbv_limits(state: AxiomState) -> list[str]:
+    """Return only the VBV fields the user actually supplied.
+
+    Bitrate does not synthesize Max Rate or Buffer Size.  When Max Rate is
+    present, a buffer defaults to twice the cap because FFmpeg otherwise
+    ignores ``-maxrate``.
+    """
+
+    bitrate = _rate_value(state.get("Video.Video_BitRate_Text") or "")
+    maxrate = _rate_value(state.get("Video.Video_MaxRate_Text") or "")
+    bufsize = _rate_value(state.get("Video.Video_BufSize_Text") or "")
+    if maxrate:
+        maxrate = _clamp_maxrate(bitrate, maxrate)
+    if maxrate and not bufsize:
+        bufsize = _double_rate(maxrate)
+    return [
+        *(["-maxrate " + maxrate] if maxrate else []),
+        *(["-bufsize " + bufsize] if bufsize else []),
+    ]
+
+
 def _row(kind: str, codec: str, section: str, name: str) -> Dict[str, Any]:
     for item in codecs.table(kind, codec, section):
         if isinstance(item, Mapping) and item.get("Name") == name:
@@ -138,28 +191,44 @@ def hardware_quality_override(
         return None
 
     row = _row("video", codec, "quality", quality)
+    custom = quality == "Custom"
+    bitrate = _rate_value(state.get("Video.Video_BitRate_Text") or "")
+    limits = _custom_vbv_limits(state) if custom else []
+    custom_bitrate = ["-b:v " + bitrate] if custom and bitrate else []
+
     if transcode == "AMD AMF":
         value = str(row.get("CRF") or crf_text)
-        return (
-            f"-rc qvbr -qvbr_quality_level {value}"
-            if value
-            else ""
-        )
+        args = ["-rc qvbr", "-qvbr_quality_level " + value] if value else []
+        if custom:
+            args += custom_bitrate
+        args += limits
+        return " ".join(args)
     if transcode == "NVIDIA NVENC":
         if codec == "H264 NVENC":
             value = str(row.get("CRF") or crf_text)
-            return f"-rc:v vbr_hq -crf {value}" if value else ""
-        value = str(row.get("CRF_HWAccel_NVIDIA_NVENC") or "")
-        bitrate = str(row.get("CBR") or "")
+            args = ["-rc:v vbr_hq", "-crf " + value] if value else []
+            if custom:
+                args += custom_bitrate
+            args += limits
+            return " ".join(args)
+        value = str(row.get("CRF_HWAccel_NVIDIA_NVENC") or crf_text)
+        row_bitrate = str(row.get("CBR") or "")
         if not value:
             return ""
         args = ["-rc:v vbr_hq", "-qmin 0", "-cq:v " + value]
-        if bitrate:
-            args.append("-b:v " + bitrate)
+        if custom:
+            args += custom_bitrate
+        elif row_bitrate:
+            args.append("-b:v " + row_bitrate)
+        args += limits
         return " ".join(args)
     if transcode == "Intel QSV":
-        value = str(row.get("CRF_HWAccel_Intel_QSV") or "")
-        return f"-global_quality {value} -look_ahead 1" if value else ""
+        value = str(row.get("CRF_HWAccel_Intel_QSV") or crf_text)
+        args = ["-global_quality " + value, "-look_ahead 1"] if value else []
+        if custom:
+            args += custom_bitrate
+        args += limits
+        return " ".join(args)
     return None
 
 
@@ -457,9 +526,7 @@ def video_quality(ctx: BuildContext, pass_name: str) -> str:
     maxrate_text = str(state.get("Video.Video_MaxRate_Text") or "")
     bufsize_text = str(state.get("Video.Video_BufSize_Text") or "")
 
-    if quality not in ("Auto", "Lossless", "None") and (
-        quality == "Custom" or pass_name == "CRF"
-    ):
+    if quality not in ("Auto", "Lossless", "None") and pass_name == "CRF":
         hardware = hardware_quality_override(
             state, str(codec or ""), quality, crf_text
         )
@@ -504,15 +571,38 @@ def video_quality(ctx: BuildContext, pass_name: str) -> str:
             v_bitmode = "-q:v" if bitrate_text.strip() else ""
             v_bitrate = bitrate_text.strip()
         else:
-            v_crf = "-crf " + crf_text.strip() if crf_text.strip() else ""
-            v_bitmode = "-b:v" if bitrate_text.strip() else ""
-            v_bitrate = _rate_value(bitrate_text)
-            if minrate_text.strip():
-                v_minrate = "-minrate " + _rate_value(minrate_text)
-            if maxrate_text.strip():
-                v_maxrate = "-maxrate " + _rate_value(maxrate_text)
-            if bufsize_text.strip():
-                v_bufsize = "-bufsize " + _rate_value(bufsize_text)
+            bitrate = _rate_value(bitrate_text)
+            minrate = _rate_value(minrate_text)
+            maxrate = _rate_value(maxrate_text)
+            bufsize = _rate_value(bufsize_text)
+            if pass_name == "CRF" and crf_text.strip():
+                v_crf = "-crf " + crf_text.strip()
+                # CRF has no minimum-bitrate target; encoders ignore -minrate.
+                minrate = ""
+                if bitrate:
+                    v_bitmode = "-b:v"
+                    v_bitrate = bitrate
+            else:
+                v_bitmode = "-b:v" if bitrate else ""
+                v_bitrate = bitrate
+                if bitrate and not vbr and not (minrate or maxrate or bufsize):
+                    # Unchecked VBR means CBR.  FFmpeg needs min/max plus a
+                    # buffer for the rate control to become truly constant.
+                    minrate = bitrate
+                    maxrate = bitrate
+                elif bitrate and (minrate or bufsize) and not maxrate:
+                    maxrate = bitrate
+            if maxrate:
+                maxrate = _clamp_maxrate(bitrate, maxrate)
+            if maxrate and not bufsize:
+                # FFmpeg ignores -maxrate unless a VBV buffer is also present.
+                bufsize = _double_rate(maxrate)
+            if minrate:
+                v_minrate = "-minrate " + minrate
+            if maxrate:
+                v_maxrate = "-maxrate " + maxrate
+            if bufsize:
+                v_bufsize = "-bufsize " + bufsize
     else:
         v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
         if minrate_text.strip():

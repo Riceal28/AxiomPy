@@ -331,3 +331,69 @@ def test_custom_crf_produces_output(tmp_path, monkeypatch):
         log[-20:]
     )
     assert (tmp_path / "custom-crf.mp4").is_file()
+
+
+def test_custom_crf_with_bitrate_produces_output(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "PATH",
+        str(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    source = tmp_path / "custom-capped.mkv"
+    _make_source(source)
+    state = AxiomState(
+        {
+            "Main.Input_Text": str(source),
+            "Format.Format_Container_SelectedItem": "mp4",
+            "Format.Format_MediaType_SelectedItem": "Video",
+            "Video.Video_Codec_SelectedItem": "x264",
+            "Video.Video_Quality_SelectedItem": "Custom",
+            "Video.Video_Pass_SelectedItem": "CRF",
+            "Video.Video_CRF_Text": "24",
+            "Video.Video_BitRate_Text": "400",
+            "Configure.Shell_SelectedItem": "CMD",
+        }
+    )
+    script = generate_runnable(state)
+    assert "-crf 24" in script
+    assert "-b:v 400K" in script
+    assert "-maxrate" not in script
+    assert "-bufsize" not in script
+
+    log: list[str] = []
+    assert run(script, RunOptions(shell="CMD"), on_log=log.append) == 0, "\n".join(
+        log[-20:]
+    )
+    assert (tmp_path / "custom-capped.mp4").is_file()
+
+
+def test_custom_cbr_defaults_produce_output(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "PATH",
+        str(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    source = tmp_path / "custom-cbr.mkv"
+    _make_source(source)
+    state = AxiomState(
+        {
+            "Main.Input_Text": str(source),
+            "Format.Format_Container_SelectedItem": "mp4",
+            "Format.Format_MediaType_SelectedItem": "Video",
+            "Video.Video_Codec_SelectedItem": "x264",
+            "Video.Video_Quality_SelectedItem": "Custom",
+            "Video.Video_Pass_SelectedItem": "1 Pass",
+            "Video.Video_BitRate_Text": "400",
+            "Video.Video_VBR_IsChecked": False,
+            "Configure.Shell_SelectedItem": "CMD",
+        }
+    )
+    script = generate_runnable(state)
+    assert "-b:v 400K" in script
+    assert "-minrate 400K" in script
+    assert "-maxrate 400K" in script
+    assert "-bufsize 800K" in script
+
+    log: list[str] = []
+    assert run(script, RunOptions(shell="CMD"), on_log=log.append) == 0, "\n".join(
+        log[-20:]
+    )
+    assert (tmp_path / "custom-cbr.mp4").is_file()

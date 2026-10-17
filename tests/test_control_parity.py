@@ -43,6 +43,12 @@ CUSTOM_RATE_KEYS = {
     "Video.Video_MinRate_Text",
     "Video.Video_MaxRate_Text",
     "Video.Video_BufSize_Text",
+    # Deliberate correction: CRF belongs to the CRF pass, and explicit VBR/CBR
+    # belongs to the bitrate passes.  The original left both controls enabled
+    # even when the generator ignored them.
+    "Video.Video_CRF_IsEnabled",
+    "Video.Video_VBR_IsEnabled",
+    "Video.Video_MinRate_IsEnabled",
 }
 
 

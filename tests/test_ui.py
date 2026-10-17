@@ -227,6 +227,45 @@ def test_custom_quality_clears_named_values_once_and_keeps_edits(qtbot):
     assert "-b:v 4500K" in window._generated_text
 
 
+def test_custom_quality_starts_on_crf_and_makes_rate_controls_effective(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.widgets["Format.Format_Container_SelectedItem"].setCurrentText("mp4")
+    quality = window.widgets["Video.Video_Quality_SelectedItem"]
+    pass_mode = window.widgets["Video.Video_Pass_SelectedItem"]
+    crf = window.widgets["Video.Video_CRF_Text"]
+    vbr = window.widgets["Video.Video_VBR_IsChecked"]
+    min_rate = window.widgets["Video.Video_MinRate_Text"]
+
+    quality.setCurrentText("Custom")
+    assert pass_mode.currentText() == "CRF"
+    assert crf.isEnabled()
+    assert not min_rate.isEnabled()
+    assert "CRF has no minimum-bitrate target" in min_rate.toolTip()
+
+    crf.setText("22")
+    assert "-crf 22" in window._generated_text
+    window.widgets["Video.Video_BitRate_Text"].setText("4000")
+    assert "-b:v 4000K" in window._generated_text
+    assert "-maxrate" not in window._generated_text
+    assert "-bufsize" not in window._generated_text
+    window.widgets["Video.Video_MaxRate_Text"].setText("3000")
+    assert "-maxrate 4000K" in window._generated_text
+    assert "-maxrate 3000K" not in window._generated_text
+    assert "-bufsize 8000K" in window._generated_text
+
+    pass_mode.setCurrentText("1 Pass")
+    assert not crf.isEnabled()
+    assert "CRF is only used by the CRF encoding pass" in crf.toolTip()
+    assert vbr.isEnabled()
+    assert min_rate.isEnabled()
+
+    pass_mode.setCurrentText("CRF")
+    assert crf.isEnabled()
+    assert not vbr.isEnabled()
+    assert "CRF is variable bitrate by definition" in vbr.toolTip()
+
+
 def test_batch_queue_lists_matching_files(qtbot, tmp_path):
     (tmp_path / "a.mp4").write_text("x", encoding="utf-8")
     (tmp_path / "b.mkv").write_text("x", encoding="utf-8")
