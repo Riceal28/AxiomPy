@@ -22,6 +22,8 @@ All notable changes to AxiomPy are recorded here. This project follows
   or `PATH` instead of hard-coded local paths.
 - Project metadata now declares PySide6, package data and GitHub-facing classifiers.
 - README now supports English/Simplified Chinese switching.
+- Tagged releases now build and upload a portable Windows archive plus SHA-256 checksum
+  through GitHub Actions.
 
 ### Fixed
 

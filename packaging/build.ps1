@@ -33,8 +33,14 @@ try {
         throw "PyInstaller failed with exit code $LASTEXITCODE"
     }
 
-    Copy-Item -LiteralPath (Join-Path $projectRoot "README.md") -Destination $dist -Force
-    Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $dist -Force
+    foreach ($name in @(
+        "README.md",
+        "README.zh-CN.md",
+        "CHANGELOG.md",
+        "LICENSE"
+    )) {
+        Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination $dist -Force
+    }
     New-Item -ItemType Directory -Path (Join-Path $dist "config") -Force | Out-Null
     Write-Host "Portable build: $dist"
 }
