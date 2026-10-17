@@ -13,6 +13,18 @@ QTabWidget::pane {
     border: 1px solid #34373d;
     background: #25272b;
 }
+QGroupBox#pathPanel {
+    background: #26292e;
+    border: 1px solid #3b3f46;
+    border-radius: 6px;
+    margin-top: 8px;
+}
+QGroupBox#pathPanel::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px;
+    color: #aeb4bc;
+}
 QTabBar::tab {
     background: #2b2e33;
     color: #c9c9c9;

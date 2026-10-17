@@ -524,6 +524,130 @@ def audio_stream_controls(state: AxiomState) -> None:
 
 
 # --------------------------------------------------------------------------------------
+# Video: hardware acceleration
+# --------------------------------------------------------------------------------------
+
+HW_CODEC_FAMILIES = {
+    "H264": {
+        "software": {"x264", "H264 AMF", "H264 NVENC", "H264 QSV"},
+        "AMD AMF": "H264 AMF",
+        "NVIDIA NVENC": "H264 NVENC",
+        "Intel QSV": "H264 QSV",
+    },
+    "HEVC": {
+        "software": {"x265", "HEVC AMF", "HEVC NVENC", "HEVC QSV"},
+        "AMD AMF": "HEVC AMF",
+        "NVIDIA NVENC": "HEVC NVENC",
+        "Intel QSV": "HEVC QSV",
+    },
+}
+
+HW_CODEC_TRANSCODE = {
+    "H264 AMF": "AMD AMF",
+    "H264 NVENC": "NVIDIA NVENC",
+    "H264 QSV": "Intel QSV",
+    "HEVC AMF": "AMD AMF",
+    "HEVC NVENC": "NVIDIA NVENC",
+    "HEVC QSV": "Intel QSV",
+}
+
+
+def set_hwaccel_video_codecs(state: AxiomState) -> None:
+    """Port of ``MainWindow.SetHWAccelVideoCodecs`` for the MP4/MKV lists."""
+    container = str(state.get("Format.Format_Container_SelectedItem") or "")
+    container_name = {"mp4": "MP4", "mkv": "MKV"}.get(container)
+    if not container_name:
+        return
+
+    spec = CONTAINERS.get(container_name) or {}
+    mode = str(state.get("Video.Video_HWAccel_SelectedItem") or "Off").casefold()
+    if mode == "on":
+        items = spec.get("video_HWAccel") or spec.get("video") or []
+    elif mode in ("off", "auto"):
+        items = spec.get("video") or []
+    else:
+        return
+    if not items:
+        return
+
+    names = item_names(items)
+    previous = str(state.get("Video.Video_Codec_SelectedItem") or "")
+    software = {
+        "H264 AMF": "x264",
+        "H264 NVENC": "x264",
+        "H264 QSV": "x264",
+        "HEVC AMF": "x265",
+        "HEVC NVENC": "x265",
+        "HEVC QSV": "x265",
+    }.get(previous, previous)
+
+    if previous in names:
+        selected = previous
+    elif software in names:
+        selected = software
+    else:
+        selected = names[0]
+
+    state.set("Video.Video_Codec_Items", list(items))
+    state.set("Video.Video_Codec_SelectedItem", selected)
+
+
+def hwaccel_mode_controls(state: AxiomState) -> None:
+    """Port of the ``cboHWAccel_SelectionChanged`` event chain."""
+    mode = str(state.get("Video.Video_HWAccel_SelectedItem") or "Off").casefold()
+    if mode == "auto":
+        state.set("Video.Video_HWAccel_Decode_IsEnabled", False)
+        state.set("Video.Video_HWAccel_Decode_SelectedItem", "auto")
+        state.set("Video.Video_HWAccel_Transcode_IsEnabled", False)
+        state.set("Video.Video_HWAccel_Transcode_SelectedItem", "auto")
+    elif mode == "on":
+        state.set("Video.Video_HWAccel_Decode_IsEnabled", True)
+        state.set("Video.Video_HWAccel_Decode_SelectedItem", "auto")
+        state.set("Video.Video_HWAccel_Transcode_IsEnabled", True)
+        state.set("Video.Video_HWAccel_Transcode_SelectedItem", "auto")
+    elif mode == "off":
+        state.set("Video.Video_HWAccel_Decode_IsEnabled", False)
+        state.set("Video.Video_HWAccel_Decode_SelectedItem", "off")
+        state.set("Video.Video_HWAccel_Transcode_IsEnabled", False)
+        state.set("Video.Video_HWAccel_Transcode_SelectedItem", "off")
+    else:
+        state.set("Video.Video_HWAccel_Decode_IsEnabled", True)
+        state.set("Video.Video_HWAccel_Decode_SelectedItem", "off")
+        state.set("Video.Video_HWAccel_Transcode_IsEnabled", True)
+        state.set("Video.Video_HWAccel_Transcode_SelectedItem", "off")
+
+    set_hwaccel_video_codecs(state)
+
+
+def select_hwaccel_video_codec(state: AxiomState) -> None:
+    """Port of ``MainWindow.SelectHWAccelVideoCodec``."""
+    codec = str(state.get("Video.Video_Codec_SelectedItem") or "")
+    transcode = str(
+        state.get("Video.Video_HWAccel_Transcode_SelectedItem") or "auto"
+    )
+    for family_name, family in HW_CODEC_FAMILIES.items():
+        if codec not in family["software"]:
+            continue
+        if transcode in family:
+            state.set("Video.Video_Codec_SelectedItem", family[transcode])
+        else:
+            default = "x264" if family_name == "H264" else "x265"
+            state.set("Video.Video_Codec_SelectedItem", default)
+        return
+
+
+def change_hwaccel_transcode(state: AxiomState) -> None:
+    """Port of ``MainWindow.ChangeHWAccelTranscode``."""
+    mode = str(state.get("Video.Video_HWAccel_SelectedItem") or "Off").casefold()
+    if mode != "on":
+        return
+    codec = str(state.get("Video.Video_Codec_SelectedItem") or "")
+    transcode = HW_CODEC_TRANSCODE.get(codec)
+    if transcode:
+        state.set("Video.Video_HWAccel_Transcode_SelectedItem", transcode)
+
+
+# --------------------------------------------------------------------------------------
 # Video: quality / bitrate / optimize
 # --------------------------------------------------------------------------------------
 

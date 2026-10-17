@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..state import AxiomState
 from .context import BuildContext
+from .metadata import stream_metadata
 
 
 def subtitle_codec(state: AxiomState) -> str:
@@ -30,4 +31,4 @@ def subtitle_mux_args(ctx: BuildContext) -> str:
 
 
 def subtitle_metadata(state: AxiomState) -> str:
-    return ""
+    return stream_metadata(state, "subtitle")

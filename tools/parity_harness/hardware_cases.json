@@ -1,0 +1,102 @@
+[
+  {
+    "id": "hw-h264-nvenc-high",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_HWAccel_SelectedItem": "On",
+      "Video.Video_HWAccel_Decode_SelectedItem": "auto",
+      "Video.Video_HWAccel_Transcode_SelectedItem": "NVIDIA NVENC",
+      "Video.Video_Codec_SelectedItem": "H264 NVENC",
+      "Video.Video_Quality_SelectedItem": "High"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "5000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "10.5",
+      "inputFrameRate": "24"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "hw-hevc-nvenc-high",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_HWAccel_SelectedItem": "On",
+      "Video.Video_HWAccel_Decode_SelectedItem": "auto",
+      "Video.Video_HWAccel_Transcode_SelectedItem": "NVIDIA NVENC",
+      "Video.Video_Codec_SelectedItem": "HEVC NVENC",
+      "Video.Video_Quality_SelectedItem": "High"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "5000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "10.5",
+      "inputFrameRate": "24"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "hw-h264-qsv-medium",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_HWAccel_SelectedItem": "On",
+      "Video.Video_HWAccel_Decode_SelectedItem": "auto",
+      "Video.Video_HWAccel_Transcode_SelectedItem": "Intel QSV",
+      "Video.Video_Codec_SelectedItem": "H264 QSV",
+      "Video.Video_Quality_SelectedItem": "Medium"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "5000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "10.5",
+      "inputFrameRate": "24"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "hw-h264-amf-high",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_HWAccel_SelectedItem": "On",
+      "Video.Video_HWAccel_Decode_SelectedItem": "auto",
+      "Video.Video_HWAccel_Transcode_SelectedItem": "AMD AMF",
+      "Video.Video_Codec_SelectedItem": "H264 AMF",
+      "Video.Video_Quality_SelectedItem": "High"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "5000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "10.5",
+      "inputFrameRate": "24"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  }
+]

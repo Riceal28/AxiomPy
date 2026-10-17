@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a reproducible problem in AxiomPy
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AxiomPy. Please remove secrets and private media paths.
+
+  - type: input
+    id: version
+    attributes:
+      label: AxiomPy version
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version, Python version and PySide6 version
+      placeholder: Windows 11 24H2, Python 3.9.10, PySide6 6.9.3
+    validations:
+      required: true
+
+  - type: input
+    id: ffmpeg
+    attributes:
+      label: FFmpeg build
+      description: Output of `ffmpeg -version`, or the bundled build version
+      placeholder: ffmpeg 8.0.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: Describe the selected preset, codecs, filters and actions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      render: shell
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I can reproduce this with the latest version or `main`.
+          required: true

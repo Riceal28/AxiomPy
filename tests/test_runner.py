@@ -1,6 +1,11 @@
 """Shell/console command wrapping and progress parsing."""
 
-from axiom.core.runner import RunOptions, build_console_command, parse_progress
+from axiom.core.runner import (
+    RunOptions,
+    build_console_command,
+    normalize_exit_code,
+    parse_progress,
+)
 
 
 def test_cmd_wrapping_switches_keep_window_flag():
@@ -38,3 +43,10 @@ def test_progress_uses_duration_from_ffmpeg_log():
 def test_progress_clamps_at_one():
     fraction, _ = parse_progress("time=00:00:12.00", 10.0)
     assert fraction == 1.0
+
+
+def test_windows_dword_exit_codes_are_normalized():
+    assert normalize_exit_code(0xFFFFFFEA) == -22
+    assert normalize_exit_code(0xFFFFFFFF) == -1
+    assert normalize_exit_code(0) == 0
+    assert normalize_exit_code(1) == 1

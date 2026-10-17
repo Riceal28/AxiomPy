@@ -203,18 +203,23 @@ def _power_shell_header(ctx: BuildContext) -> str:
     return " ".join(parts)
 
 
-def _inner_command(state: AxiomState, ctx: BuildContext) -> str:
+def _inner_command(
+    state: AxiomState,
+    ctx: BuildContext,
+    *,
+    clean: bool = False,
+) -> str:
     pass_name = state.get("Video.Video_Pass_SelectedItem")
     if pass_name == "2 Pass":
-        first, second = pipeline.two_pass_commands(state, ctx)
+        first, second = pipeline.two_pass_commands(state, ctx, clean=clean)
         operator = " ; " if ctx.shell == "PowerShell" else " && "
         return first + operator + second
-    return pipeline.single_pass(state, ctx)
+    return pipeline.single_pass(state, ctx, clean=clean)
 
 
-def generate(state: AxiomState) -> str:
+def generate(state: AxiomState, *, clean: bool = False) -> str:
     ctx = build_context(state)
-    command = _inner_command(state, ctx)
+    command = _inner_command(state, ctx, clean=clean)
 
     if ctx.shell == "PowerShell":
         return _power_shell_header(ctx) + " " + command + " }"

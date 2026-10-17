@@ -51,10 +51,10 @@ class Script:
 
 def generate_script(state: AxiomState) -> Script:
     """Build the command and capture the state that affects how it is run."""
-    from .generate import generate
+    from .generate import generate_runnable
 
     return Script(
-        text=generate(state),
+        text=generate_runnable(state),
         shell=str(state.get("Configure.Shell_SelectedItem") or "CMD"),
         keep_window=bool(state.get("Main.CMDWindowKeep_IsChecked")),
         two_pass=state.get("Video.Video_Pass_SelectedItem") == "2 Pass",

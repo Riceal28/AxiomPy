@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..state import AxiomState
-from ..text import remove_line_breaks
+from ..text import remove_line_breaks, replace_line_breaks_with_spaces
 from . import audio, filters_audio, format as fmt, streams, subtitles, video
 from .context import BuildContext, build_context, join_args
 
@@ -162,7 +162,21 @@ def _tail(ctx: BuildContext) -> list[str]:
     ]
 
 
-def single_pass(state: AxiomState, ctx: BuildContext) -> str:
+def _assemble(parts: list[str], clean: bool) -> str:
+    text = join_args(*parts)
+    return (
+        replace_line_breaks_with_spaces(text)
+        if clean
+        else remove_line_breaks(text)
+    )
+
+
+def single_pass(
+    state: AxiomState,
+    ctx: BuildContext,
+    *,
+    clean: bool = False,
+) -> str:
     pass_name = str(state.get("Video.Video_Pass_SelectedItem") or "1 Pass")
     if _video_enabled(state):
         ctx.v_filter = video.video_filter(ctx)
@@ -177,10 +191,15 @@ def single_pass(state: AxiomState, ctx: BuildContext) -> str:
         + _subtitle_parts(ctx)
         + _tail(ctx)
     )
-    return remove_line_breaks(join_args(*parts))
+    return _assemble(parts, clean)
 
 
-def two_pass_commands(state: AxiomState, ctx: BuildContext) -> tuple[str, str]:
+def two_pass_commands(
+    state: AxiomState,
+    ctx: BuildContext,
+    *,
+    clean: bool = False,
+) -> tuple[str, str]:
     """Return ``(pass 1, pass 2)`` without choosing the shell's join operator."""
     pass_name = "2 Pass"
     video_parts_1 = (
@@ -197,7 +216,7 @@ def two_pass_commands(state: AxiomState, ctx: BuildContext) -> tuple[str, str]:
             "NUL",
         ]
     )
-    pass1 = remove_line_breaks(join_args(*pass1_parts))
+    pass1 = _assemble(pass1_parts, clean)
 
     video_parts_2 = (
         _video_pass2(ctx, pass_name) if _video_enabled(state) else ["-vn"]
@@ -210,7 +229,7 @@ def two_pass_commands(state: AxiomState, ctx: BuildContext) -> tuple[str, str]:
         + _subtitle_parts(ctx)
         + _tail(ctx)
     )
-    pass2 = remove_line_breaks(join_args(*pass2_parts))
+    pass2 = _assemble(pass2_parts, clean)
 
     return pass1, pass2
 
@@ -220,9 +239,10 @@ def two_pass(state: AxiomState, ctx: BuildContext) -> str:
     return pass1 + " && " + pass2
 
 
-def generate(state: AxiomState) -> str:
+def generate(state: AxiomState, *, clean: bool = False) -> str:
     ctx = build_context(state)
     pass_name = str(state.get("Video.Video_Pass_SelectedItem") or "")
     if pass_name == "2 Pass" and state.get("Format.Format_MediaType_SelectedItem") == "Video":
-        return two_pass(state, ctx)
-    return single_pass(state, ctx)
+        first, second = two_pass_commands(state, ctx, clean=clean)
+        return first + " && " + second
+    return single_pass(state, ctx, clean=clean)

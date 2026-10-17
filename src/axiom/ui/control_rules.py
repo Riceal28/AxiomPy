@@ -33,6 +33,10 @@ def structural_scope(state_key: str) -> str:
     if group == "Video":
         if field == "Video_Codec_SelectedItem":
             return "video_codec"
+        if field == "Video_HWAccel_SelectedItem":
+            return "hardware_mode"
+        if field == "Video_HWAccel_Transcode_SelectedItem":
+            return "hardware_transcode"
         if field in {
             "Video_Quality_SelectedItem",
             "Video_Pass_SelectedItem",

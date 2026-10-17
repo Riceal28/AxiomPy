@@ -1,9 +1,40 @@
+# Python
 __pycache__/
 *.py[cod]
-.pytest_cache/
+*$py.class
+*.so
 .venv/
+venv/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Packaging
 build/
 dist/
 *.egg-info/
+*.whl
+
+# Runtime and local data
+artifacts/
+config/
+*.log
+ffmpeg2pass-*.log
+*.tmp
+
+# Local development helpers and generated parity sources
+scripts/
 tools/parity_harness/bin/
 tools/parity_harness/obj/
+tools/parity_harness/gen_src/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

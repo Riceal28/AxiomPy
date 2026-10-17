@@ -4,29 +4,56 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axiom-py"
-version = "0.1.0"
-description = "Axiom FFmpeg UI - Python/PySide6 rewrite of the WPF original"
+version = "0.2.0"
+description = "A PySide6 desktop frontend for building and running FFmpeg commands"
 readme = "README.md"
-requires-python = ">=3.9"
-license = { text = "GPL-3.0-or-later" }
-dependencies = []
+requires-python = ">=3.9,<3.14"
+authors = [{ name = "AxiomPy contributors" }]
+license = { file = "LICENSE" }
+keywords = ["ffmpeg", "video", "audio", "desktop", "pyside6", "qt"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Video",
+]
+dependencies = ["PySide6>=6.9,<6.10"]
 
 [project.optional-dependencies]
-ui = ["PySide6>=6.9,<6.10"]
-dev = ["pytest>=8", "pytest-qt>=4.4"]
+dev = ["pytest>=8", "pytest-qt>=4.4", "Pillow>=10"]
 package = ["pyinstaller>=6.16"]
 
 [project.scripts]
 axiom-cli = "axiom.cli:main"
 axiom-gui = "axiom.ui.app:main"
 
+[project.urls]
+Homepage = "https://github.com/Riceal28/AxiomPy"
+Repository = "https://github.com/Riceal28/AxiomPy.git"
+Issues = "https://github.com/Riceal28/AxiomPy/issues"
+Upstream = "https://github.com/MattMcManis/Axiom"
+Changelog = "https://github.com/Riceal28/AxiomPy/blob/main/CHANGELOG.md"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+axiom = ["ui/theme/*.qss"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra --strict-config"
 

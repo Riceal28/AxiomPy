@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import re
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication
+from PySide6.QtCore import QByteArray, Qt, QThread, Signal
+from PySide6.QtGui import QAction, QCloseEvent, QColor, QGuiApplication
 from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QDockWidget,
@@ -17,6 +20,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -31,6 +35,8 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QStatusBar,
     QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -39,9 +45,15 @@ from PySide6.QtWidgets import (
 from axiom.core import controls
 from axiom.core.batch_scan import scan_batch_files
 from axiom.core.config import PresetStore, Settings
-from axiom.core.generate import generate, resolve_controls
+from axiom.core.generate import generate_runnable, resolve_controls
+from axiom.core.generate.context import build_context
 from axiom.core.generate.naming import OUTPUT_TOKEN_NAMES
-from axiom.core.runner import RunOptions, run as run_script
+from axiom.core.runner import (
+    RunOptions,
+    normalize_exit_code,
+    preview_async,
+    run as run_script,
+)
 from axiom.core.script import Script
 from axiom.core.state import AxiomState
 
@@ -60,6 +72,14 @@ SELECTIVE_COLORS = (
     "Blacks",
 )
 
+BATCH_INPUT_PATTERN = re.compile(r"Input #\d+.*? from '(.+?)'")
+DEFAULT_FONT_SIZE = 9
+FONT_SIZE_OPTIONS = tuple(range(8, 17))
+FONT_SIZE_KEY = "Ui.FontSize"
+SAVE_WORKSPACE_KEY = "Ui.SaveWorkspaceOnExit"
+WORKSPACE_KEY = "Ui.Workspace"
+WORKSPACE_SCHEMA = 1
+
 SETTINGS_KEYS = (
     "Configure.FFmpegPath_Text",
     "Configure.FFprobePath_Text",
@@ -76,6 +96,7 @@ SETTINGS_KEYS = (
     "Configure.LogPath_Text",
     "Main.CMDWindowKeep_IsChecked",
     "Main.ExternalConsole_IsChecked",
+    "Main.AutoSortScript_IsChecked",
 )
 
 
@@ -85,6 +106,28 @@ def _names(items) -> list[str]:
 
 def _inline_text(text: str) -> str:
     return " ".join(text.splitlines()).strip()
+
+
+class PathDropEdit(QLineEdit):
+    """Line edit that accepts a local file or folder dragged from Explorer."""
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:
+        paths = [
+            url.toLocalFile()
+            for url in event.mimeData().urls()
+            if url.isLocalFile()
+        ]
+        if not paths:
+            super().dropEvent(event)
+            return
+        self.setText(paths[0])
+        event.acceptProposedAction()
 
 
 class _RunWorker(QThread):
@@ -104,13 +147,18 @@ class _RunWorker(QThread):
         self.cancel = cancel
 
     def run(self) -> None:
-        code = run_script(
-            self.script,
-            self.options,
-            on_log=self.log.emit,
-            on_progress=self.progress.emit,
-            cancel=self.cancel,
-        )
+        try:
+            code = run_script(
+                self.script,
+                self.options,
+                on_log=self.log.emit,
+                on_progress=self.progress.emit,
+                cancel=self.cancel,
+            )
+        except Exception as error:
+            self.log.emit(f"Failed to run process: {type(error).__name__}: {error}")
+            code = 1
+        code = normalize_exit_code(code)
         self.done.emit(code, self.cancel.is_set())
 
 
@@ -126,17 +174,26 @@ class MainWindow(QMainWindow):
         self.combo_items: dict[str, str] = {}
         self._loading = False
         self._updating_script = False
-        self._script_sorted = False
+        self._script_sorted = bool(
+            self.state.get("Main.AutoSortScript_IsChecked")
+        )
         self._script_dirty = False
         self._generated_text = ""
         self._worker: _RunWorker | None = None
         self._cancel_event = threading.Event()
+        self._metadata_loading = False
+        self._batch_current_row = -1
+        self._font_size = DEFAULT_FONT_SIZE
+        self._save_workspace_on_exit = True
+        self._settings_path: Path | None = None
+        self._persist_on_close = False
 
         self.setWindowTitle("AxiomPy")
-        self.resize(1320, 900)
+        self.resize(1280, 720)
         self._build_ui()
         self._load_presets()
         self._refresh_controls(full=True)
+        self.state.set("Audio.Audio_Stream_SelectedItem", "all")
         self._populate_widgets()
         self._regenerate(force=True)
 
@@ -168,9 +225,13 @@ class MainWindow(QMainWindow):
         self.addAction(run_action)
 
     def _build_paths(self) -> QWidget:
-        holder = QWidget(self)
+        holder = QGroupBox("Input / Output", self)
+        holder.setObjectName("pathPanel")
+        self.path_panel = holder
         grid = QGridLayout(holder)
-        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setContentsMargins(12, 18, 12, 10)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
 
         self.preset_combo = QComboBox(self)
         self.preset_combo.setMinimumWidth(190)
@@ -178,7 +239,7 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel("Preset", self), 0, 0)
         grid.addWidget(self.preset_combo, 0, 1)
 
-        self.input_edit = QLineEdit(self)
+        self.input_edit = PathDropEdit(self)
         self.input_edit.setPlaceholderText("Input file or batch directory")
         self.input_edit.textChanged.connect(self._on_paths)
         grid.addWidget(QLabel("Input", self), 0, 2)
@@ -209,7 +270,7 @@ class MainWindow(QMainWindow):
         self.batch_ext.textChanged.connect(self._on_paths)
         grid.addWidget(self.batch_ext, 0, 6)
 
-        self.output_edit = QLineEdit(self)
+        self.output_edit = PathDropEdit(self)
         self.output_edit.setPlaceholderText("Output directory (optional)")
         self.output_edit.textChanged.connect(self._on_paths)
         grid.addWidget(QLabel("Output", self), 1, 2)
@@ -248,6 +309,13 @@ class MainWindow(QMainWindow):
         self.sort_button = QPushButton("Sort", self)
         self.sort_button.clicked.connect(self._toggle_script_sort)
         script_buttons.addWidget(self.sort_button)
+        self.auto_sort_check = QCheckBox("Auto Sort", self)
+        self.auto_sort_check.blockSignals(True)
+        self.auto_sort_check.setChecked(self._script_sorted)
+        self.auto_sort_check.blockSignals(False)
+        self.auto_sort_check.toggled.connect(self._on_auto_sort)
+        script_buttons.addWidget(self.auto_sort_check)
+        self.sort_button.setText("Inline" if self._script_sorted else "Sort")
         for label, slot in (
             ("Regenerate", lambda: self._regenerate(force=True)),
             ("Copy", self._copy_script),
@@ -288,7 +356,14 @@ class MainWindow(QMainWindow):
             Qt.Horizontal,
         )
 
-        self.batch_list = QListWidget(self)
+        self.batch_list = QTableWidget(0, 2, self)
+        self.batch_list.setHorizontalHeaderLabels(["File", "Status"])
+        self.batch_list.verticalHeader().setVisible(False)
+        self.batch_list.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.batch_list.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.batch_list.horizontalHeader().setStretchLastSection(False)
+        self.batch_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.batch_list.setColumnWidth(1, 90)
         self.batch_list.setToolTip("Files the batch command will visit")
         batch_widget = QWidget(self)
         batch_layout = QVBoxLayout(batch_widget)
@@ -307,7 +382,9 @@ class MainWindow(QMainWindow):
         self.batch_dock = QDockWidget("Batch Queue", self)
         self.batch_dock.setObjectName("batchDock")
         self.batch_dock.setWidget(batch_widget)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.batch_dock)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.batch_dock)
+        self.tabifyDockWidget(self.script_dock, self.batch_dock)
+        self.resizeDocks([self.script_dock], [260], Qt.Vertical)
         self.batch_dock.hide()
 
     def _build_status(self) -> None:
@@ -328,6 +405,9 @@ class MainWindow(QMainWindow):
         self.run_button = QPushButton("Run", self)
         self.run_button.clicked.connect(self._run)
         status.addPermanentWidget(self.run_button)
+        self.preview_button = QPushButton("Preview", self)
+        self.preview_button.clicked.connect(self._preview)
+        status.addPermanentWidget(self.preview_button)
 
     def _page(self) -> tuple[QWidget, QFormLayout]:
         page = QWidget(self)
@@ -485,6 +565,7 @@ class MainWindow(QMainWindow):
             "Hardware Acceleration",
             "Video.Video_HWAccel_SelectedItem",
             "Video.Video_HWAccel_Items",
+            structural=True,
         )
         self._add_combo(
             form,
@@ -497,6 +578,7 @@ class MainWindow(QMainWindow):
             "HW Transcode",
             "Video.Video_HWAccel_Transcode_SelectedItem",
             "Video.Video_HWAccel_Transcode_Items",
+            structural=True,
         )
         self._add_combo(
             form,
@@ -733,13 +815,16 @@ class MainWindow(QMainWindow):
         mux, mux_form = self._scroll_form()
         self.audio_list = QListWidget(self)
         self.audio_list.setMinimumHeight(180)
+        self.audio_list.currentRowChanged.connect(self._load_audio_metadata)
         mux_form.addRow("External Audio", self.audio_list)
         self.audio_buttons = self._stream_buttons(
             mux_form,
             self.audio_list,
             self._add_audio,
             self._remove_audio,
+            clear=self._clear_audio,
         )
+        self._add_metadata_editor(mux_form, "audio")
         tabs.addTab(mux, "External Audio")
         return tabs
 
@@ -760,6 +845,7 @@ class MainWindow(QMainWindow):
         )
         self.subtitle_list = QListWidget(self)
         self.subtitle_list.setMinimumHeight(220)
+        self.subtitle_list.currentRowChanged.connect(self._load_subtitle_metadata)
         form.addRow("External Files", self.subtitle_list)
         self.subtitle_buttons = self._stream_buttons(
             form,
@@ -768,6 +854,7 @@ class MainWindow(QMainWindow):
             self._remove_subtitles,
             clear=self._clear_subtitles,
         )
+        self._add_metadata_editor(form, "subtitle")
         return page
 
     def _stream_buttons(
@@ -798,6 +885,27 @@ class MainWindow(QMainWindow):
             buttons.append(clear_button)
         form.addRow("", row)
         return buttons
+
+    def _add_metadata_editor(self, form: QFormLayout, kind: str) -> None:
+        group = "Audio" if kind == "audio" else "Subtitle"
+        box = QGroupBox("Selected Track Metadata", self)
+        meta_form = QFormLayout(box)
+        title = QLineEdit(self)
+        language = QComboBox(self)
+        language.addItems(_names(self.state.get(f"{group}.{group}_Metadata_Language_Items")))
+        language.setCurrentText("none")
+        delay = QLineEdit(self)
+        delay.setPlaceholderText("Stored per file, for example +250 or -120")
+        title.textChanged.connect(lambda _value: self._save_metadata(kind))
+        language.currentTextChanged.connect(lambda _value: self._save_metadata(kind))
+        delay.textChanged.connect(lambda _value: self._save_metadata(kind))
+        meta_form.addRow("Title", title)
+        meta_form.addRow("Language", language)
+        meta_form.addRow("Delay (ms)", delay)
+        form.addRow(box)
+        setattr(self, f"{kind}_meta_title", title)
+        setattr(self, f"{kind}_meta_language", language)
+        setattr(self, f"{kind}_meta_delay", delay)
 
     def _build_filters_tab(self) -> QWidget:
         tabs = QTabWidget(self)
@@ -977,6 +1085,19 @@ class MainWindow(QMainWindow):
         tabs.addTab(files, "File")
 
         system, form = self._scroll_form()
+        interface = QGroupBox("Interface", self)
+        interface_form = QFormLayout(interface)
+        self.font_size_combo = QComboBox(self)
+        self.font_size_combo.addItems([str(value) for value in FONT_SIZE_OPTIONS])
+        self.font_size_combo.setCurrentText(str(self._font_size))
+        self.font_size_combo.currentTextChanged.connect(self._on_font_size)
+        interface_form.addRow("Font Size", self.font_size_combo)
+        self.save_workspace_check = QCheckBox("Save workspace on exit", self)
+        self.save_workspace_check.setChecked(self._save_workspace_on_exit)
+        self.save_workspace_check.toggled.connect(self._on_save_workspace)
+        interface_form.addRow(self.save_workspace_check)
+        form.addRow(interface)
+
         save_preset = QPushButton("Save User Preset…", self)
         save_preset.clicked.connect(self._save_preset)
         delete_preset = QPushButton("Delete User Preset…", self)
@@ -1023,14 +1144,24 @@ class MainWindow(QMainWindow):
             self.output_edit.setText(str(self.state.get("Main.Output_Text") or ""))
             self.batch_check.setChecked(bool(self.state.get("Main.Batch_IsChecked")))
             self.batch_ext.setText(str(self.state.get("Main.BatchExtension_Text") or ""))
-            self._populate_path_list(
-                self.audio_list,
-                self.state.values.get("_audio_paths") or [],
-            )
-            self._populate_path_list(
-                self.subtitle_list,
-                self.state.values.get("_subtitle_paths") or [],
-            )
+            self._metadata_loading = True
+            try:
+                self._populate_path_list(
+                    self.audio_list,
+                    self.state.values.get("_audio_paths") or [],
+                )
+                self._populate_path_list(
+                    self.subtitle_list,
+                    self.state.values.get("_subtitle_paths") or [],
+                )
+            finally:
+                self._metadata_loading = False
+            if self.audio_list.count():
+                self.audio_list.setCurrentRow(0)
+            if self.subtitle_list.count():
+                self.subtitle_list.setCurrentRow(0)
+            self._load_audio_metadata()
+            self._load_subtitle_metadata()
             selected = set(
                 self.state.get("Configure.OutputNaming_ListView_SelectedItems") or []
             )
@@ -1052,6 +1183,11 @@ class MainWindow(QMainWindow):
             widget.addItem(item)
 
     def _sync_widget_states(self) -> None:
+        auto_sort = bool(self.state.get("Main.AutoSortScript_IsChecked"))
+        if self.auto_sort_check.isChecked() != auto_sort:
+            self.auto_sort_check.blockSignals(True)
+            self.auto_sort_check.setChecked(auto_sort)
+            self.auto_sort_check.blockSignals(False)
         for key, widget in self.widgets.items():
             flag = enabled_key(key)
             if flag and flag in self.state.values:
@@ -1072,12 +1208,28 @@ class MainWindow(QMainWindow):
 
         audio_codec = self.state.get("Audio.Audio_Codec_SelectedItem")
         audio_mux = self.state.get("Audio.Audio_Stream_SelectedItem") == "mux"
+        audio_enabled = audio_mux and audio_codec not in (None, "None", "Copy")
         for widget in [self.audio_list, *self.audio_buttons]:
-            widget.setEnabled(audio_mux and audio_codec not in (None, "None", "Copy"))
+            widget.setEnabled(audio_enabled)
+        for widget in (
+            self.audio_meta_title,
+            self.audio_meta_language,
+            self.audio_meta_delay,
+        ):
+            widget.setEnabled(audio_enabled and self.audio_list.currentRow() >= 0)
 
         subtitle_codec = self.state.get("Subtitle.Subtitle_Codec_SelectedItem")
+        subtitle_enabled = subtitle_codec not in (None, "None", "Copy")
         for widget in [self.subtitle_list, *self.subtitle_buttons]:
-            widget.setEnabled(subtitle_codec not in (None, "None", "Copy"))
+            widget.setEnabled(subtitle_enabled)
+        for widget in (
+            self.subtitle_meta_title,
+            self.subtitle_meta_language,
+            self.subtitle_meta_delay,
+        ):
+            widget.setEnabled(
+                subtitle_enabled and self.subtitle_list.currentRow() >= 0
+            )
 
         self.token_list.setEnabled(
             bool(self.state.get("Configure.OutputNaming_ListView_IsEnabled"))
@@ -1156,6 +1308,8 @@ class MainWindow(QMainWindow):
         self.state.set("Main.BatchExtension_IsEnabled", checked)
         self._refresh_batch_queue()
         self._sync_widget_states()
+        if checked:
+            self.batch_dock.raise_()
         self._regenerate()
 
     def _on_preset(self, name: str) -> None:
@@ -1185,6 +1339,7 @@ class MainWindow(QMainWindow):
     def _refresh_controls(self, full: bool = False) -> None:
         if full:
             resolve_controls(self.state)
+            controls.hwaccel_mode_controls(self.state)
         else:
             controls.media_type_controls(self.state)
             controls.media_type_controls_selected_items(self.state)
@@ -1196,14 +1351,22 @@ class MainWindow(QMainWindow):
         state = self.state
         if scope == "container":
             resolve_controls(state)
+            controls.hwaccel_mode_controls(state)
         elif scope == "media_type":
             controls.media_type_controls(state)
             controls.media_type_controls_selected_items(state)
             controls.cut_controls(state)
             controls.audio_stream_controls(state)
+            controls.hwaccel_mode_controls(state)
         elif scope == "cut":
             controls.cut_controls(state)
-        elif scope == "video_codec":
+        elif scope in ("video_codec", "hardware_mode", "hardware_transcode"):
+            if scope == "video_codec":
+                controls.change_hwaccel_transcode(state)
+            elif scope == "hardware_mode":
+                controls.hwaccel_mode_controls(state)
+            else:
+                controls.select_hwaccel_video_codec(state)
             codec = state.get("Video.Video_Codec_SelectedItem")
             if codec:
                 controls.codec_controls(state, "video", str(codec))
@@ -1330,7 +1493,7 @@ class MainWindow(QMainWindow):
         self.state.set("Main.Output_Text", self.output_edit.text())
         self.state.set("Main.BatchExtension_Text", self.batch_ext.text())
         try:
-            generated = generate(self.state)
+            generated = generate_runnable(self.state)
         except Exception as error:  # keep the shell usable while editing
             generated = f"# {type(error).__name__}: {error}"
         self._generated_text = generated
@@ -1360,9 +1523,24 @@ class MainWindow(QMainWindow):
             text = script.sorted_text
         self._script_sorted = not self._script_sorted
         self.sort_button.setText("Inline" if self._script_sorted else "Sort")
+        self._set_auto_sort_control(self._script_sorted)
         self._set_script_text(text)
         self._script_dirty = False
         self.script_info.setText("Generated")
+
+    def _set_auto_sort_control(self, checked: bool) -> None:
+        self.state.set("Main.AutoSortScript_IsChecked", checked)
+        self.auto_sort_check.blockSignals(True)
+        self.auto_sort_check.setChecked(checked)
+        self.auto_sort_check.blockSignals(False)
+
+    def _on_auto_sort(self, checked: bool) -> None:
+        if self._loading:
+            return
+        self._script_sorted = checked
+        self.sort_button.setText("Inline" if checked else "Sort")
+        self.state.set("Main.AutoSortScript_IsChecked", checked)
+        self._regenerate(force=True)
 
     def _copy_script(self) -> None:
         clipboard = QGuiApplication.clipboard()
@@ -1413,27 +1591,169 @@ class MainWindow(QMainWindow):
 
     # -- external streams -------------------------------------------------
     def _refresh_batch_queue(self) -> None:
-        self.batch_list.clear()
+        self.batch_list.setRowCount(0)
+        self._batch_current_row = -1
         if not self.batch_check.isChecked():
             self.batch_status.setText("Batch queue is empty")
             return
         files = scan_batch_files(self.input_edit.text(), self.batch_ext.text())
-        for path in files:
-            item = QListWidgetItem(path.name)
-            item.setToolTip(str(path))
-            item.setData(Qt.UserRole, str(path))
-            self.batch_list.addItem(item)
+        self.batch_list.setRowCount(len(files))
+        for row, path in enumerate(files):
+            file_item = QTableWidgetItem(path.name)
+            file_item.setToolTip(str(path))
+            file_item.setData(Qt.UserRole, str(path))
+            status_item = QTableWidgetItem("Pending")
+            self.batch_list.setItem(row, 0, file_item)
+            self.batch_list.setItem(row, 1, status_item)
         self.batch_status.setText(f"{len(files)} file(s) queued")
 
-    def _reveal_batch_item(self) -> None:
-        item = self.batch_list.currentItem()
+    def _set_batch_row_status(self, row: int, status: str) -> None:
+        item = self.batch_list.item(row, 1)
         if item is None:
             return
-        path = Path(str(item.data(Qt.UserRole)))
+        item.setText(status)
+        colors = {
+            "Pending": "#9aa0a6",
+            "Running": "#5aa9e6",
+            "Completed": "#65c18c",
+            "Failed": "#e06c75",
+            "Cancelled": "#d6a84b",
+        }
+        item.setForeground(QColor(colors.get(status, "#e6e6e6")))
+        self._update_batch_summary()
+
+    def _update_batch_summary(self) -> None:
+        counts: dict[str, int] = {}
+        for row in range(self.batch_list.rowCount()):
+            item = self.batch_list.item(row, 1)
+            status = item.text() if item is not None else "Pending"
+            counts[status] = counts.get(status, 0) + 1
+        if not counts:
+            self.batch_status.setText("Batch queue is empty")
+            return
+        parts = [
+            f"{status} {counts[status]}"
+            for status in ("Completed", "Running", "Failed", "Cancelled", "Pending")
+            if counts.get(status)
+        ]
+        self.batch_status.setText(" · ".join(parts))
+
+    def _reset_batch_status(self) -> None:
+        self._batch_current_row = -1
+        for row in range(self.batch_list.rowCount()):
+            self._set_batch_row_status(row, "Pending")
+
+    def _batch_row_for_name(self, name: str) -> int:
+        wanted = Path(name).name.casefold()
+        for row in range(self.batch_list.rowCount()):
+            item = self.batch_list.item(row, 0)
+            if item is not None and Path(item.text()).name.casefold() == wanted:
+                return row
+        return -1
+
+    def _handle_batch_log(self, line: str) -> None:
+        match = BATCH_INPUT_PATTERN.search(line)
+        if match:
+            row = self._batch_row_for_name(match.group(1))
+            if row >= 0:
+                if (
+                    self._batch_current_row >= 0
+                    and self._batch_current_row != row
+                    and self.batch_list.item(self._batch_current_row, 1).text()
+                    == "Running"
+                ):
+                    self._set_batch_row_status(self._batch_current_row, "Completed")
+                self._batch_current_row = row
+                self._set_batch_row_status(row, "Running")
+            return
+        if self._batch_current_row < 0:
+            return
+        lowered = line.lower()
+        if "error opening" in lowered or "conversion failed" in lowered:
+            self._set_batch_row_status(self._batch_current_row, "Failed")
+
+    def _reveal_batch_item(self) -> None:
+        row = self.batch_list.currentRow()
+        if row < 0 or self.batch_list.item(row, 0) is None:
+            return
+        path = Path(str(self.batch_list.item(row, 0).data(Qt.UserRole)))
         try:
             os.startfile(str(path.parent))  # type: ignore[attr-defined]
         except (AttributeError, OSError):
             self.status_label.setText(str(path.parent))
+
+    def _metadata_rows(self, kind: str, count: int) -> list[dict]:
+        key = f"_{kind}_metadata"
+        rows = [
+            dict(row) if isinstance(row, dict) else {}
+            for row in (self.state.values.get(key) or [])
+        ]
+        while len(rows) < count:
+            rows.append({"title": "", "language": "none", "delay": ""})
+        del rows[count:]
+        self.state.set(key, rows)
+        return rows
+
+    def _metadata_editor(self, kind: str):
+        return (
+            getattr(self, f"{kind}_meta_title"),
+            getattr(self, f"{kind}_meta_language"),
+            getattr(self, f"{kind}_meta_delay"),
+        )
+
+    def _load_audio_metadata(self, row: int | None = None) -> None:
+        self._load_metadata("audio", row)
+
+    def _load_subtitle_metadata(self, row: int | None = None) -> None:
+        self._load_metadata("subtitle", row)
+
+    def _load_metadata(self, kind: str, row: int | None = None) -> None:
+        if self._metadata_loading:
+            return
+        widget = self.audio_list if kind == "audio" else self.subtitle_list
+        if row is None:
+            row = widget.currentRow()
+        rows = self._metadata_rows(kind, widget.count())
+        data = rows[row] if 0 <= row < len(rows) else {}
+        title, language, delay = self._metadata_editor(kind)
+        self._metadata_loading = True
+        try:
+            title.setText(str(data.get("title") or ""))
+            language.setCurrentText(str(data.get("language") or "none"))
+            delay.setText(str(data.get("delay") or ""))
+        finally:
+            self._metadata_loading = False
+        self._sync_widget_states()
+
+    def _save_metadata(self, kind: str) -> None:
+        if self._metadata_loading:
+            return
+        widget = self.audio_list if kind == "audio" else self.subtitle_list
+        row = widget.currentRow()
+        if row < 0:
+            return
+        rows = self._metadata_rows(kind, widget.count())
+        title, language, delay = self._metadata_editor(kind)
+        rows[row] = {
+            "title": title.text(),
+            "language": language.currentText(),
+            "delay": delay.text(),
+        }
+        self.state.set(f"_{kind}_metadata", rows)
+        self._regenerate()
+
+    def _drop_metadata_rows(
+        self,
+        kind: str,
+        rows_to_drop: list[int],
+        count: int,
+    ) -> None:
+        key = f"_{kind}_metadata"
+        rows = self._metadata_rows(kind, count)
+        for row in sorted(rows_to_drop, reverse=True):
+            if 0 <= row < len(rows):
+                del rows[row]
+        self.state.set(key, rows)
 
     def _add_audio(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
@@ -1443,15 +1763,31 @@ class MainWindow(QMainWindow):
         )
         if not paths:
             return
+        first_new = self.audio_list.count()
         current = list(self.state.values.get("_audio_paths") or [])
         current.extend(paths)
         self.state.set("_audio_paths", current)
+        self._metadata_rows("audio", len(current))
         self._populate_widgets()
+        self.audio_list.setCurrentRow(first_new)
         self._regenerate()
 
     def _remove_audio(self) -> None:
-        self._remove_stream_rows(self.audio_list)
+        count = self.audio_list.count()
+        self._metadata_loading = True
+        try:
+            rows = self._remove_stream_rows(self.audio_list)
+        finally:
+            self._metadata_loading = False
+        self._drop_metadata_rows("audio", rows, count)
         self.state.set("_audio_paths", self._list_paths(self.audio_list))
+        self._populate_widgets()
+        self._regenerate()
+
+    def _clear_audio(self) -> None:
+        self.state.set("_audio_paths", [])
+        self.state.set("_audio_metadata", [])
+        self._populate_widgets()
         self._regenerate()
 
     def _add_subtitles(self) -> None:
@@ -1462,23 +1798,34 @@ class MainWindow(QMainWindow):
         )
         if not paths:
             return
+        first_new = self.subtitle_list.count()
         current = list(self.state.values.get("_subtitle_paths") or [])
         current.extend(paths)
         self.state.set("_subtitle_paths", current)
+        self._metadata_rows("subtitle", len(current))
         self._populate_widgets()
+        self.subtitle_list.setCurrentRow(first_new)
         self._regenerate()
 
     def _remove_subtitles(self) -> None:
-        self._remove_stream_rows(self.subtitle_list)
+        count = self.subtitle_list.count()
+        self._metadata_loading = True
+        try:
+            rows = self._remove_stream_rows(self.subtitle_list)
+        finally:
+            self._metadata_loading = False
+        self._drop_metadata_rows("subtitle", rows, count)
         self.state.set("_subtitle_paths", self._list_paths(self.subtitle_list))
+        self._populate_widgets()
         self._regenerate()
 
     def _clear_subtitles(self) -> None:
         self.state.set("_subtitle_paths", [])
+        self.state.set("_subtitle_metadata", [])
         self._populate_widgets()
         self._regenerate()
 
-    def _remove_stream_rows(self, widget: QListWidget) -> None:
+    def _remove_stream_rows(self, widget: QListWidget) -> list[int]:
         rows = sorted(
             (index.row() for index in widget.selectedIndexes()),
             reverse=True,
@@ -1487,19 +1834,30 @@ class MainWindow(QMainWindow):
             rows = [widget.currentRow()]
         for row in rows:
             widget.takeItem(row)
+        return rows
 
     def _move_stream(self, widget: QListWidget, offset: int) -> None:
         row = widget.currentRow()
         target = row + offset
         if row < 0 or target < 0 or target >= widget.count():
             return
-        item = widget.takeItem(row)
-        widget.insertItem(target, item)
+        self._metadata_loading = True
+        try:
+            item = widget.takeItem(row)
+            widget.insertItem(target, item)
+        finally:
+            self._metadata_loading = False
         widget.setCurrentRow(target)
+        kind = "audio" if widget is self.audio_list else "subtitle"
+        metadata = self._metadata_rows(kind, widget.count())
+        moved = metadata.pop(row)
+        metadata.insert(target, moved)
+        self.state.set(f"_{kind}_metadata", metadata)
         if widget is self.audio_list:
             self.state.set("_audio_paths", self._list_paths(widget))
         else:
             self.state.set("_subtitle_paths", self._list_paths(widget))
+        self._load_metadata(kind, target)
         self._regenerate()
 
     # -- presets ----------------------------------------------------------
@@ -1520,29 +1878,173 @@ class MainWindow(QMainWindow):
             self._load_presets()
             self.status_label.setText(f"Deleted preset {name.strip()}")
 
+    # -- workspace / interface settings -----------------------------------
+    def _on_font_size(self, value: str) -> None:
+        if self._loading:
+            return
+        try:
+            size = int(value)
+        except (TypeError, ValueError):
+            return
+        self._apply_font_size(size)
+
+    def _apply_font_size(self, size: int) -> None:
+        size = max(min(int(size), max(FONT_SIZE_OPTIONS)), min(FONT_SIZE_OPTIONS))
+        self._font_size = size
+        app = QApplication.instance()
+        if app is not None:
+            font = app.font()
+            font.setPointSize(size)
+            app.setFont(font)
+            stylesheet = app.styleSheet()
+            if stylesheet:
+                updated = re.sub(
+                    r"font-size:\s*\d+(?:\.\d+)?pt;",
+                    f"font-size: {size}pt;",
+                    stylesheet,
+                )
+                if updated != stylesheet:
+                    app.setStyleSheet(updated)
+        combo = getattr(self, "font_size_combo", None)
+        if combo is not None:
+            combo.blockSignals(True)
+            combo.setCurrentText(str(size))
+            combo.blockSignals(False)
+
+    def _on_save_workspace(self, checked: bool) -> None:
+        if not self._loading:
+            self._save_workspace_on_exit = checked
+
+    def _workspace_payload(self) -> dict:
+        return {
+            "schema": WORKSPACE_SCHEMA,
+            "geometry": bytes(self.saveGeometry().toBase64()).decode("ascii"),
+            "window_state": bytes(self.saveState().toBase64()).decode("ascii"),
+            "state": self.state.to_overrides(),
+            "tabs": {
+                "top": self.tabs.currentIndex(),
+                "video": self.video_tabs.currentIndex(),
+                "audio": self.audio_tabs.currentIndex(),
+                "filters": self.filter_tabs.currentIndex(),
+                "settings": self.settings_tabs.currentIndex(),
+            },
+            "script_text": self.script_view.toPlainText(),
+            "script_dirty": bool(self._script_dirty),
+            "script_sorted": bool(self._script_sorted),
+        }
+
+    def _restore_workspace(self, payload: object) -> bool:
+        if not isinstance(payload, dict) or payload.get("schema") != WORKSPACE_SCHEMA:
+            return False
+
+        state_values = payload.get("state")
+        if isinstance(state_values, dict):
+            self.state = AxiomState()
+            self.state.update(state_values)
+            try:
+                resolve_controls(self.state)
+            except Exception:
+                pass
+            self.state.update(state_values)
+            self.state.flags["controlsResolved"] = True
+
+        self._script_sorted = bool(
+            payload.get("script_sorted", self.state.get("Main.AutoSortScript_IsChecked"))
+        )
+        self._set_auto_sort_control(self._script_sorted)
+        self.sort_button.setText("Inline" if self._script_sorted else "Sort")
+        self._populate_widgets()
+
+        preset = str(self.state.get("Main.Preset_SelectedItem") or "Preset")
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.setCurrentText(preset)
+        self.preset_combo.blockSignals(False)
+
+        tabs = payload.get("tabs")
+        if isinstance(tabs, dict):
+            for key, widget in (
+                ("top", self.tabs),
+                ("video", self.video_tabs),
+                ("audio", self.audio_tabs),
+                ("filters", self.filter_tabs),
+                ("settings", self.settings_tabs),
+            ):
+                try:
+                    index = int(tabs.get(key, 0))
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= index < widget.count():
+                    widget.setCurrentIndex(index)
+
+        geometry = payload.get("geometry")
+        if isinstance(geometry, str) and geometry:
+            self.restoreGeometry(QByteArray.fromBase64(geometry.encode("ascii")))
+        window_state = payload.get("window_state")
+        if isinstance(window_state, str) and window_state:
+            self.restoreState(QByteArray.fromBase64(window_state.encode("ascii")))
+
+        self._regenerate(force=True)
+        script_text = payload.get("script_text")
+        if payload.get("script_dirty") and isinstance(script_text, str) and script_text:
+            self._set_script_text(script_text)
+            self._script_dirty = True
+            self.script_info.setText("Edited")
+        return True
+
     def _settings_values(self) -> dict:
-        return {key: self.state.get(key) for key in SETTINGS_KEYS}
+        values = {key: self.state.get(key) for key in SETTINGS_KEYS}
+        values[FONT_SIZE_KEY] = self._font_size
+        values[SAVE_WORKSPACE_KEY] = bool(self._save_workspace_on_exit)
+        if self._save_workspace_on_exit:
+            values[WORKSPACE_KEY] = self._workspace_payload()
+        return values
 
     def _save_settings(self, path: Path | None = None) -> Path | None:
+        target_path = Path(path) if path is not None else self._settings_path
         try:
-            target = Settings(self._settings_values()).save(path)
+            target = Settings(self._settings_values()).save(target_path)
         except OSError as error:
             self.status_label.setText(f"Could not save settings: {error}")
             return None
+        self._settings_path = target_path
+        self._persist_on_close = True
         self.status_label.setText(f"Settings saved to {target}")
         return target
 
     def _load_settings(self, path: Path | None = None) -> Settings | None:
+        target_path = Path(path) if path is not None else self._settings_path
         try:
-            settings = Settings.load(path)
+            settings = Settings.load(target_path)
         except (OSError, ValueError) as error:
             self.status_label.setText(f"Could not load settings: {error}")
             return None
+        self._settings_path = target_path
+        self._persist_on_close = True
+        try:
+            font_size = int(settings.get(FONT_SIZE_KEY, DEFAULT_FONT_SIZE))
+        except (TypeError, ValueError):
+            font_size = DEFAULT_FONT_SIZE
+        self._apply_font_size(font_size)
+        self._save_workspace_on_exit = bool(
+            settings.get(SAVE_WORKSPACE_KEY, True)
+        )
+        self.save_workspace_check.blockSignals(True)
+        self.save_workspace_check.setChecked(self._save_workspace_on_exit)
+        self.save_workspace_check.blockSignals(False)
+
         for key, value in settings.values.items():
             if key in self.state.values:
                 self.state.set(key, value)
-        self._populate_widgets()
-        self._regenerate(force=True)
+        self._script_sorted = bool(
+            self.state.get("Main.AutoSortScript_IsChecked")
+        )
+        self.sort_button.setText("Inline" if self._script_sorted else "Sort")
+        restored = False
+        if self._save_workspace_on_exit:
+            restored = self._restore_workspace(settings.get(WORKSPACE_KEY))
+        if not restored:
+            self._populate_widgets()
+            self._regenerate(force=True)
         self.status_label.setText("Settings loaded")
         return settings
 
@@ -1573,6 +2075,24 @@ class MainWindow(QMainWindow):
         except (AttributeError, OSError):
             self.status_label.setText(str(target))
 
+    def _preview(self) -> None:
+        if self.batch_check.isChecked():
+            QMessageBox.information(self, "Preview", "Cannot preview a batch queue.")
+            return
+        source = Path(self.input_edit.text())
+        if not source.is_file():
+            QMessageBox.warning(self, "Preview", "Choose an existing input file.")
+            return
+        ffplay = str(self.state.get("Configure.FFplayPath_Text") or "<auto>")
+        if ffplay == "<auto>":
+            ffplay = "ffplay"
+        try:
+            preview_async(source, ffplay)
+        except OSError as error:
+            QMessageBox.critical(self, "Preview", str(error))
+            return
+        self.status_label.setText(f"Previewing {source.name}")
+
     def _run_options(self) -> RunOptions:
         log_path = None
         if bool(self.state.get("Configure.LogCheckBox_IsChecked")):
@@ -1585,14 +2105,27 @@ class MainWindow(QMainWindow):
             process_priority=str(
                 self.state.get("Configure.ProcessPriority_SelectedItem") or "Default"
             ),
-            window_title=str(
-                self.state.get("Configure.ShellTitle_SelectedItem") or ""
-            ),
+            window_title=self._console_title(),
             log_path=log_path,
             show_console=bool(
                 self.state.get("Main.ExternalConsole_IsChecked")
             ),
         )
+
+    def _console_title(self) -> str:
+        mode = str(
+            self.state.get("Configure.ShellTitle_SelectedItem") or "Disabled"
+        )
+        if mode in ("", "Disabled", "Custom"):
+            return ""
+        context = build_context(self.state)
+        if mode == "Filename":
+            return f"{context.input_filename}{context.output_ext}"
+        if mode == "Filename+Tokens":
+            return Path(context.output_path).name
+        if mode == "Tokens":
+            return Path(context.output_path).stem
+        return ""
 
     def _run(self) -> None:
         if self._worker and self._worker.isRunning():
@@ -1604,15 +2137,23 @@ class MainWindow(QMainWindow):
 
         self.log_view.clear()
         self._cancel_event.clear()
+        if self.batch_check.isChecked():
+            self._reset_batch_status()
         self.progress_bar.setValue(0)
         self.run_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.status_label.setText("Running…")
         self._worker = _RunWorker(script, self._run_options(), self._cancel_event)
-        self._worker.log.connect(self.log_view.append)
+        self._worker.log.connect(self._on_log)
         self._worker.progress.connect(self._on_progress)
         self._worker.done.connect(self._on_run_done)
+        self._worker.finished.connect(self._on_worker_finished)
         self._worker.start()
+
+    def _on_log(self, line: str) -> None:
+        self.log_view.append(line)
+        if self.batch_check.isChecked():
+            self._handle_batch_log(line)
 
     def _on_progress(self, fraction: float, _line: str) -> None:
         self.progress_bar.setValue(max(0, min(1000, round(fraction * 1000))))
@@ -1626,6 +2167,15 @@ class MainWindow(QMainWindow):
     def _on_run_done(self, code: int, cancelled: bool) -> None:
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
+        if self.batch_check.isChecked() and self._batch_current_row >= 0:
+            item = self.batch_list.item(self._batch_current_row, 1)
+            if item is not None and item.text() == "Running":
+                if cancelled:
+                    self._set_batch_row_status(self._batch_current_row, "Cancelled")
+                elif code == 0:
+                    self._set_batch_row_status(self._batch_current_row, "Completed")
+                else:
+                    self._set_batch_row_status(self._batch_current_row, "Failed")
         if cancelled:
             self.status_label.setText("Cancelled")
         elif code == 0:
@@ -1634,10 +2184,17 @@ class MainWindow(QMainWindow):
         else:
             self.status_label.setText(f"Failed with exit code {code}")
         self.log_view.append(f"\nProcess exited with code {code}")
+
+    def _on_worker_finished(self) -> None:
+        worker = self._worker
         self._worker = None
+        if worker is not None:
+            worker.deleteLater()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self._worker and self._worker.isRunning():
             self._cancel_event.set()
             self._worker.wait(2000)
+        if self._persist_on_close:
+            self._save_settings(self._settings_path)
         event.accept()

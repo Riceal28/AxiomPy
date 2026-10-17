@@ -12,13 +12,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pprint
 import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-DEFAULT_SRC = Path(r"G:\Codex_workspace\Axiom\source\Axiom\Axiom")
+DEFAULT_SRC = Path(
+    os.environ.get(
+        "AXIOM_REFERENCE_SRC",
+        REPO.parent / "Axiom" / "source" / "Axiom" / "Axiom",
+    )
+)
 DEFAULT_GOLDEN = REPO / "tests" / "golden"
 DEFAULT_OUT = REPO / "src" / "axiom" / "core" / "presets_data.py"
 

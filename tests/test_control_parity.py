@@ -28,6 +28,7 @@ CASE_FILES = [
     Path(__file__).parent.parent / "tools" / "parity_harness" / "preset_cases.json",
     Path(__file__).parent.parent / "tools" / "parity_harness" / "output_cases.json",
     Path(__file__).parent.parent / "tools" / "parity_harness" / "external_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "hardware_cases.json",
 ]
 
 SETTINGS_RUNTIME_KEYS = {

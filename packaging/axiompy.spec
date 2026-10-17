@@ -1,19 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+import shutil
 from pathlib import Path
 
 
 project = Path(SPECPATH).resolve().parent
-ffmpeg_bin = Path(os.environ.get("AXIOM_FFMPEG_BIN", r"F:\ffmpeg-8.0.1\bin"))
+ffmpeg_env = os.environ.get("AXIOM_FFMPEG_BIN")
+ffmpeg_bin = Path(ffmpeg_env).resolve() if ffmpeg_env else None
+if ffmpeg_bin is None:
+    ffmpeg_exe = shutil.which("ffmpeg")
+    ffmpeg_bin = Path(ffmpeg_exe).resolve().parent if ffmpeg_exe else None
 theme = project / "src" / "axiom" / "ui" / "theme" / "axiom_dark.qss"
+console = os.environ.get("AXIOM_BUILD_CONSOLE") == "1"
+app_name = "AxiomPyDebug" if console else "AxiomPy"
 
+if ffmpeg_bin is None:
+    raise SystemExit("FFmpeg not found. Set AXIOM_FFMPEG_BIN or add ffmpeg to PATH.")
 missing = [name for name in ("ffmpeg.exe", "ffprobe.exe", "ffplay.exe") if not (ffmpeg_bin / name).is_file()]
 if missing:
     raise SystemExit(f"Missing bundled tools in {ffmpeg_bin}: {', '.join(missing)}")
 
 a = Analysis(
-    [str(project / "src" / "axiom" / "ui" / "app.py")],
+    [str(project / "packaging" / "entrypoint.py")],
     pathex=[str(project / "src")],
     binaries=[
         (str(ffmpeg_bin / "ffmpeg.exe"), "."),
@@ -35,12 +44,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="AxiomPy",
+    name=app_name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    console=console,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -55,5 +64,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="AxiomPy",
+    name=app_name,
 )

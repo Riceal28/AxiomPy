@@ -15,6 +15,18 @@ TIME_PATTERN = re.compile(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)")
 DURATION_PATTERN = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 
 
+def normalize_exit_code(code: int) -> int:
+    """Return a Windows process exit code as a signed 32-bit integer.
+
+    ``subprocess`` exposes Windows DWORD exit codes as unsigned Python ints.
+    Values such as ``0xFFFFFFEA`` therefore arrive as ``4294967274`` and
+    overflow Qt's C++ ``int`` signal parameters.
+    """
+    if 0x80000000 <= code <= 0xFFFFFFFF:
+        return code - 0x100000000
+    return code
+
+
 @dataclass
 class RunOptions:
     """Everything the shell/console layer needs to launch a command."""
@@ -118,7 +130,13 @@ def run(
         creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
     )
     if options.shell == "PowerShell":
-        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+        source = script
+        if options.window_title:
+            escaped = options.window_title.replace("'", "''")
+            source = (
+                f"$Host.UI.RawUI.WindowTitle = '{escaped}'; " + source
+            )
+        encoded = base64.b64encode(source.encode("utf-16-le")).decode("ascii")
         process = subprocess.Popen(
             [
                 "powershell.exe",
@@ -164,7 +182,7 @@ def run(
     finally:
         if log_handle:
             log_handle.close()
-    return process.wait()
+    return normalize_exit_code(process.wait())
 
 
 def _run_external(
@@ -195,6 +213,9 @@ def _run_external(
         process = subprocess.Popen(command, **popen_kwargs)
     else:
         command_line = script + (" & pause" if options.keep_window else "")
+        if options.window_title:
+            title = options.window_title.replace('"', '""')
+            command_line = f'title "{title}" & {command_line}'
         process = subprocess.Popen(
             command_line,
             shell=True,
@@ -207,10 +228,21 @@ def _run_external(
             _terminate_process_tree(process)
             break
         time.sleep(0.2)
-    return process.wait()
+    return normalize_exit_code(process.wait())
 
 
 def preview(input_path: Path | str, ffplay: str = "ffplay") -> int:
     """Port of Preview.FFplay.Preview (simple ffplay launch)."""
-    return subprocess.call([ffplay, "-i", str(input_path)])
+    return normalize_exit_code(subprocess.call([ffplay, "-i", str(input_path)]))
+
+
+def preview_async(
+    input_path: Path | str,
+    ffplay: str = "ffplay",
+) -> subprocess.Popen:
+    """Launch ffplay without blocking the Qt event loop."""
+    return subprocess.Popen(
+        [ffplay, "-i", str(input_path)],
+        stdin=subprocess.DEVNULL,
+    )
 

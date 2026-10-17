@@ -8,6 +8,7 @@ from .. import codecs
 from ..state import AxiomState
 from ..text import normalize_value
 from .context import BuildContext
+from .metadata import stream_metadata
 
 
 def _row(codec: str, section: str, name: str) -> Dict[str, Any]:
@@ -229,7 +230,7 @@ def channel(state: AxiomState) -> str:
 
 
 def audio_metadata(state: AxiomState) -> str:
-    return ""
+    return stream_metadata(state, "audio")
 
 
 def audio_mux(ctx: BuildContext) -> str:

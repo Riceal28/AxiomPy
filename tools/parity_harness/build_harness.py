@@ -18,13 +18,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_SRC = Path(r"G:\Codex_workspace\Axiom\source\Axiom\Axiom")
+REPO = HERE.parent.parent
+DEFAULT_SRC = Path(
+    os.environ.get(
+        "AXIOM_REFERENCE_SRC",
+        REPO.parent / "Axiom" / "source" / "Axiom" / "Axiom",
+    )
+)
 GEN = HERE / "gen_src"
 MEMBERS_JSON = HERE / "members.json"
 

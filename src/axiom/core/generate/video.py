@@ -88,6 +88,49 @@ def bit_rate_mode(state: AxiomState, quality: str, bitrate_text: str, vbr: bool)
     return str(row.get("VBR_BitMode" if vbr else "CBR_BitMode") or "")
 
 
+def hardware_quality_override(
+    state: AxiomState,
+    codec: str,
+    quality: str,
+    crf_text: str,
+) -> str | None:
+    """Return the original NVENC/QSV CRF arguments, or ``None`` if not intercepted."""
+    if str(state.get("Video.Video_HWAccel_SelectedItem") or "").casefold() != "on":
+        return None
+    transcode = str(
+        state.get("Video.Video_HWAccel_Transcode_SelectedItem") or ""
+    )
+    if transcode in ("", "off", "auto", "AMD AMF"):
+        return None
+    if codec not in (
+        "H264 NVENC",
+        "HEVC NVENC",
+        "H264 QSV",
+        "HEVC QSV",
+    ):
+        return None
+    if not crf_text.strip():
+        return None
+
+    row = _row("video", codec, "quality", quality)
+    if transcode == "NVIDIA NVENC":
+        if codec == "H264 NVENC":
+            value = str(row.get("CRF") or crf_text)
+            return f"-rc:v vbr_hq -crf {value}" if value else ""
+        value = str(row.get("CRF_HWAccel_NVIDIA_NVENC") or "")
+        bitrate = str(row.get("CBR") or "")
+        if not value:
+            return ""
+        args = ["-rc:v vbr_hq", "-qmin 0", "-cq:v " + value]
+        if bitrate:
+            args.append("-b:v " + bitrate)
+        return " ".join(args)
+    if transcode == "Intel QSV":
+        value = str(row.get("CRF_HWAccel_Intel_QSV") or "")
+        return f"-global_quality {value} -look_ahead 1" if value else ""
+    return None
+
+
 def video_bitrate_calculator(ctx: BuildContext) -> str:
     state = ctx.state
     if not (state.get("Main.Input_Text") or "").strip():
@@ -381,6 +424,15 @@ def video_quality(ctx: BuildContext, pass_name: str) -> str:
     minrate_text = str(state.get("Video.Video_MinRate_Text") or "")
     maxrate_text = str(state.get("Video.Video_MaxRate_Text") or "")
     bufsize_text = str(state.get("Video.Video_BufSize_Text") or "")
+
+    if quality not in ("Auto", "Lossless", "None") and (
+        quality == "Custom" or pass_name == "CRF"
+    ):
+        hardware = hardware_quality_override(
+            state, str(codec or ""), quality, crf_text
+        )
+        if hardware is not None:
+            return hardware
 
     v_lossless = ""
     v_bitmode = ""

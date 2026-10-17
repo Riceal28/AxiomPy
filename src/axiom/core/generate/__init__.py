@@ -45,6 +45,23 @@ def generate(state: AxiomState) -> str:
     return generate_single(state)
 
 
+def generate_runnable(state: AxiomState) -> str:
+    """Return a command with line-break-separated fragments safely spaced.
+
+    The original ``ffmpegArgs`` removes line breaks without replacing them, which
+    can concatenate external-stream maps.  The parity surface keeps that quirk;
+    the desktop runner uses this clean assembly instead.
+    """
+    from . import batch
+    from .pipeline import generate as generate_single
+
+    if not state.flags.get("controlsResolved"):
+        resolve_controls(state)
+    if state.get("Main.Batch_IsChecked"):
+        return batch.generate(state, clean=True)
+    return generate_single(state, clean=True)
+
+
 def resolve_controls(state: AxiomState) -> AxiomState:
     """Resolve the container/media-type/codec/quality state like the GUI does."""
     from ..controls import resolve
@@ -63,6 +80,7 @@ def generate_args(state: AxiomState) -> list[str]:
 
 __all__ = [
     "generate",
+    "generate_runnable",
     "generate_args",
     "generate_script",
     "Script",

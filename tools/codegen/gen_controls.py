@@ -18,12 +18,19 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import pprint
 import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_SRC = Path(r"G:\Codex_workspace\Axiom\source\Axiom\Axiom")
+REPO = HERE.parent.parent
+DEFAULT_SRC = Path(
+    os.environ.get(
+        "AXIOM_REFERENCE_SRC",
+        REPO.parent / "Axiom" / "source" / "Axiom" / "Axiom",
+    )
+)
 DEFAULT_OUT = HERE.parent.parent / "src" / "axiom" / "core" / "controls_data.py"
 
 KINDS = {
