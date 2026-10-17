@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterator
@@ -18,21 +19,83 @@ from .presets_data import BUILTIN_PRESETS, PRESET_VARIANTS
 SCHEMA_VERSION = 1
 APP_DIR_NAME = "AxiomPy"
 SETTINGS_FILE_NAME = "axiom.json"
+NOTIFY_FILE_NAME = "notify.json"
 PRESET_SUFFIX = ".json"
 
 
+def source_project_root() -> Path:
+    """Return the repository root when running from source."""
+    module_path = Path(__file__).resolve()
+    for parent in module_path.parents:
+        if (parent / "pyproject.toml").is_file():
+            return parent
+    working_dir = Path.cwd().resolve()
+    for parent in (working_dir, *working_dir.parents):
+        if (parent / "pyproject.toml").is_file():
+            return parent
+    return working_dir
+
+
+def legacy_config_dir() -> Path:
+    """Return the pre-portable ``%APPDATA%\\AxiomPy`` location."""
+    return Path(os.environ.get("APPDATA", Path.home())) / APP_DIR_NAME
+
+
 def default_config_dir(portable_root: Path | None = None) -> Path:
-    """Portable ``config/`` wins over ``%APPDATA%\\AxiomPy\\`` (as the original did)."""
+    """Store configuration beside the application, never in ``%APPDATA%``.
+
+    A frozen or portable build uses ``<root>/config``.  A source checkout uses
+    the repository's own ``config/`` directory so local runs keep their data in
+    the project.  ``AXIOM_PORTABLE_ROOT`` explicitly selects the portable root.
+    """
     root = portable_root
     if root is None:
         override = os.environ.get("AXIOM_PORTABLE_ROOT")
         if override:
             root = Path(override)
     if root is not None:
-        portable = Path(root) / "config"
-        if portable.is_dir():
-            return portable
-    return Path(os.environ.get("APPDATA", Path.home())) / APP_DIR_NAME
+        return Path(root) / "config"
+    return source_project_root() / "config"
+
+
+def migrate_legacy_config(target: Path | None = None) -> list[Path]:
+    """Copy ``%APPDATA%\\AxiomPy`` data into the project config once.
+
+    Existing target files always win.  The legacy directory is left untouched
+    so the migration remains non-destructive and can be repeated safely.
+    """
+    destination_root = (
+        Path(target) if target is not None else default_config_dir()
+    )
+    legacy_root = legacy_config_dir()
+    try:
+        if (
+            not legacy_root.is_dir()
+            or legacy_root.resolve() == destination_root.resolve()
+        ):
+            return []
+    except OSError:
+        return []
+
+    destination_root.mkdir(parents=True, exist_ok=True)
+    copied: list[Path] = []
+    for name in (SETTINGS_FILE_NAME, NOTIFY_FILE_NAME):
+        source = legacy_root / name
+        destination = destination_root / name
+        if source.is_file() and not destination.exists():
+            shutil.copy2(source, destination)
+            copied.append(destination)
+
+    legacy_presets = legacy_root / "presets"
+    if legacy_presets.is_dir():
+        destination_presets = destination_root / "presets"
+        destination_presets.mkdir(parents=True, exist_ok=True)
+        for source in sorted(legacy_presets.glob("*" + PRESET_SUFFIX)):
+            destination = destination_presets / source.name
+            if not destination.exists():
+                shutil.copy2(source, destination)
+                copied.append(destination)
+    return copied
 
 
 @dataclass

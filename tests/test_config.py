@@ -5,6 +5,8 @@ from axiom.core.config import (
     PresetStore,
     Settings,
     default_config_dir,
+    migrate_legacy_config,
+    source_project_root,
 )
 
 
@@ -48,4 +50,36 @@ def test_portable_config_environment_override(tmp_path, monkeypatch):
     portable.mkdir()
     monkeypatch.setenv("AXIOM_PORTABLE_ROOT", str(tmp_path))
     assert default_config_dir() == portable
+
+
+def test_source_config_lives_in_project(monkeypatch):
+    monkeypatch.delenv("AXIOM_PORTABLE_ROOT", raising=False)
+    assert default_config_dir() == source_project_root() / "config"
+
+
+def test_legacy_appdata_config_migrates_once(tmp_path, monkeypatch):
+    legacy = tmp_path / "AxiomPy"
+    presets = legacy / "presets"
+    presets.mkdir(parents=True)
+    (legacy / "axiom.json").write_text('{"schema": 1}', encoding="utf-8")
+    (legacy / "notify.json").write_text('{"schema": 1}', encoding="utf-8")
+    (presets / "Mine.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    target = tmp_path / "project" / "config"
+
+    copied = migrate_legacy_config(target)
+
+    assert (target / "axiom.json").read_text(encoding="utf-8") == (
+        '{"schema": 1}'
+    )
+    assert (target / "notify.json").is_file()
+    assert (target / "presets" / "Mine.json").is_file()
+    assert len(copied) == 3
+
+    (target / "axiom.json").write_text('{"keep": true}', encoding="utf-8")
+    migrate_legacy_config(target)
+
+    assert (target / "axiom.json").read_text(encoding="utf-8") == (
+        '{"keep": true}'
+    )
 

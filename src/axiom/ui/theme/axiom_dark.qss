@@ -68,6 +68,35 @@ QComboBox QAbstractItemView {
     background: #1d1f23;
     border: 1px solid #3b3f46;
 }
+QTableWidget, QTableView {
+    background: #17191c;
+    alternate-background-color: #1d2024;
+    border: 1px solid #3b3f46;
+    gridline-color: #3a3f47;
+    selection-background-color: #3a6ea5;
+    selection-color: #ffffff;
+}
+QHeaderView {
+    background: #30353c;
+}
+QHeaderView::section {
+    background: #30353c;
+    color: #f2f4f7;
+    padding: 5px 6px;
+    border: none;
+    border-right: 1px solid #4a5059;
+    border-bottom: 1px solid #4a5059;
+    font-weight: 600;
+}
+QHeaderView::section:hover {
+    background: #3a4048;
+}
+QTableCornerButton::section {
+    background: #30353c;
+    border: none;
+    border-right: 1px solid #4a5059;
+    border-bottom: 1px solid #4a5059;
+}
 QPushButton {
     background: #343840;
     border: 1px solid #474c55;

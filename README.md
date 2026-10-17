@@ -23,9 +23,11 @@ option as raw text.
 - CRF, VBR, CBR, lossless, 1-pass and 2-pass modes.
 - External audio/subtitle muxing, stream selection, metadata and burn-in subtitles.
 - Batch queue with per-file `Pending`, `Running`, `Completed`, `Failed` and
-  `Cancelled` states.
+  `Cancelled` states, plus current-file and total progress bars.
 - Editable generated script, sorting, copy/save/load, progress, cancellation and
   optional external console.
+- Optional HTTP notifications with hot-reloadable `notify.json`, custom URL,
+  headers and body, and selectable/renamable FFmpeg result fields.
 - Presets, ffprobe analysis, preview, drag-and-drop input/output paths and a portable
   PyInstaller build.
 - 1280x720 default layout, adjustable 8–16 pt interface font and optional restoration
@@ -203,12 +205,17 @@ presets.
 
 | Data | Location |
 |---|---|
+| Source configuration | `<project>/config/axiom.json` |
 | Portable configuration | `<portable>/config/axiom.json` |
-| Standard configuration | `%APPDATA%\AxiomPy\axiom.json` |
+| Notify configuration | `<config>/notify.json` |
 | User presets | `<config>/presets/*.json` |
 
-The portable `config` directory takes precedence when it exists. Settings, presets and
-workspace snapshots use schema version 1 and are written as UTF-8 JSON.
+Configuration always lives beside the application: source runs use the repository's
+`config` directory, and portable builds use `config` next to `AxiomPy.exe`. On first
+launch, an existing `%APPDATA%\AxiomPy` configuration is copied into that directory
+without overwriting files that are already present; the old directory is left
+untouched. Settings, presets and workspace snapshots use schema version 1 and are
+written as UTF-8 JSON.
 
 ## Build a portable package
 
@@ -248,10 +255,10 @@ pytest -q
 
 Current validation on the development machine:
 
-- `371 passed, 8 skipped`
-- opt-in real FFmpeg conversion tests: `8 passed`, including H.264/HEVC NVENC and
+- `394 passed, 9 skipped`
+- opt-in real FFmpeg conversion tests: `9 passed`, including H.264/HEVC NVENC and
   Custom CRF/bitrate/CBR cases
-- 13 native Windows screenshot pages matched at `0.0000%`
+- 15 native Windows screenshot pages matched at `0.0000%`
 
 ### Parity harness
 

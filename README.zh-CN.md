@@ -21,8 +21,10 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 - 支持 CRF、VBR、CBR、无损、1-pass 和 2-pass 模式。
 - 支持外部音频/字幕混流、流选择、元数据设置和字幕烧录。
 - 批处理队列支持逐文件显示 `Pending`、`Running`、`Completed`、`Failed` 和
-  `Cancelled` 状态。
+  `Cancelled` 状态，并提供当前文件进度和总进度两个进度条。
 - 生成的脚本可编辑、排序、复制、保存和加载，并支持进度、取消及可选外部控制台。
+- 可选 HTTP 通知支持热加载 `notify.json`、自定义 URL/Header/Body，并可从 FFmpeg
+  执行结果中选择、关闭或重命名通知参数。
 - 内置预设、ffprobe 分析、预览、输入/输出拖放以及 PyInstaller 便携版构建。
 - 默认采用 1280x720 布局，支持 8–16 pt 界面字体缩放，并可在退出时选择是否恢复
   完整工作区。
@@ -170,12 +172,15 @@ AxiomPy 使用带版本号的 JSON 配置，不再读取旧的 `axiom.conf` 和 
 
 | 数据 | 位置 |
 |---|---|
+| 源码运行配置 | `<项目根目录>/config/axiom.json` |
 | 便携版配置 | `<portable>/config/axiom.json` |
-| 标准配置 | `%APPDATA%\AxiomPy\axiom.json` |
+| 通知配置 | `<config>/notify.json` |
 | 用户预设 | `<config>/presets/*.json` |
 
-如果便携版 `config` 目录存在，会优先使用该目录。设置、预设和工作区快照使用 schema
-版本 1，并以 UTF-8 JSON 格式写入。
+配置始终保存在程序旁边：源码运行时使用仓库根目录的 `config`，便携版使用
+`AxiomPy.exe` 同级的 `config`。首次启动时，如果存在旧的
+`%APPDATA%\AxiomPy` 配置，会自动复制到该目录，但不会覆盖已有文件；旧目录保持
+不变。设置、预设和工作区快照使用 schema 版本 1，并以 UTF-8 JSON 格式写入。
 
 ## 构建便携包
 
@@ -212,10 +217,10 @@ pytest -q
 
 当前开发环境的验证结果：
 
-- `371 passed, 8 skipped`
-- 可选的 FFmpeg 真实转换测试：`8 passed`，包含 H.264/HEVC NVENC 与 Custom
+- `394 passed, 9 skipped`
+- 可选的 FFmpeg 真实转换测试：`9 passed`，包含 H.264/HEVC NVENC 与 Custom
   CRF/码率/CBR 用例
-- 13 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`
+- 15 个原生 Windows 截图页面全部匹配，差异为 `0.0000%`
 
 ### 一致性测试工具
 

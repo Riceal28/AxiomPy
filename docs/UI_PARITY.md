@@ -57,8 +57,8 @@ debug console, crop window, file-properties window and legacy theme/config forma
 
 ## Screenshot comparison
 
-`tests/ui-baseline` contains 13 deterministic screenshots: all main tabs, all Video,
-Audio, Filters and Settings sub-pages, plus the batch queue.
+`tests/ui-baseline` contains 15 deterministic screenshots: all main tabs, all Video,
+Audio, Filters, Notify and Settings sub-pages, plus the batch queue.
 
 ```powershell
 python tools/ui_snapshots.py

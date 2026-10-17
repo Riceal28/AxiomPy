@@ -397,3 +397,48 @@ def test_custom_cbr_defaults_produce_output(tmp_path, monkeypatch):
         log[-20:]
     )
     assert (tmp_path / "custom-cbr.mp4").is_file()
+
+
+def test_batch_reports_file_and_total_progress(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "PATH",
+        str(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    first = tmp_path / "batch-one.mp4"
+    second = tmp_path / "batch-two.mp4"
+    _make_source(first)
+    _make_source(second)
+    output_dir = tmp_path / "batch-out"
+    output_dir.mkdir()
+    ffmpeg = str(FFMPEG_BIN / "ffmpeg.exe")
+    script = (
+        f'cd /d "{tmp_path}" && for %f in (*.mp4) do ('
+        f'"{ffmpeg}" -v error -y -i "%~ff" -c:v libx264 '
+        f'-preset veryslow "{output_dir}\\%~nf.out.mp4")'
+    )
+    current: list[tuple[float, str]] = []
+    total: list[tuple[float, str]] = []
+
+    assert run(
+        script,
+        RunOptions(
+            shell="CMD",
+            batch_files=[first, second],
+            ffprobe=str(FFMPEG_BIN / "ffprobe.exe"),
+            progress_interval_ms=200,
+        ),
+        on_progress=lambda fraction, name: current.append((fraction, name)),
+        on_total_progress=lambda fraction, name: total.append(
+            (fraction, name)
+        ),
+    ) == 0
+
+    assert total
+    assert total[-1][0] == 1.0
+    assert current
+    assert {name for _, name in current} <= {
+        first.name,
+        second.name,
+    }
+    assert (output_dir / "batch-one.out.mp4").is_file()
+    assert (output_dir / "batch-two.out.mp4").is_file()

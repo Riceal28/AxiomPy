@@ -8,6 +8,8 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
+from axiom.core.config import migrate_legacy_config
+
 from .main_window import MainWindow
 
 
@@ -35,6 +37,7 @@ def _stylesheet() -> str:
 
 def main() -> int:
     _prepare_runtime()
+    migrate_legacy_config()
     app = QApplication(sys.argv)
     app.setApplicationName("AxiomPy")
     app.setStyleSheet(_stylesheet())

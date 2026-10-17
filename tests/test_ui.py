@@ -1,27 +1,35 @@
 """GUI smoke tests for the M2 shell."""
 
 import threading
+from types import SimpleNamespace
 
 from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication
 
 from axiom.core.config import Settings
-from axiom.core.runner import RunOptions
+from axiom.core.notify import (
+    NOTIFY_MESSAGE_EXAMPLE,
+    NotifyStore,
+    render_notify,
+)
+from axiom.core.runner import RunOptions, RunReport
 from axiom.ui.main_window import MainWindow
 from axiom.ui.main_window import _RunWorker
+from axiom.ui.main_window import PROGRESS_INTERVAL_KEY
 
 
 def test_main_window_has_all_top_level_tabs(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window.tabs.count() == 6
-    assert [window.tabs.tabText(i) for i in range(6)] == [
+    assert window.tabs.count() == 7
+    assert [window.tabs.tabText(i) for i in range(7)] == [
         "Format",
         "Video",
         "Audio",
         "Subtitles",
         "Filters",
+        "Notify",
         "Settings",
     ]
 
@@ -516,6 +524,202 @@ def test_console_title_modes(qtbot):
     assert window._console_title() == "clip.mp4"
     window.state.set("Configure.ShellTitle_SelectedItem", "Disabled")
     assert window._console_title() == ""
+
+
+def test_progress_update_interval_defaults_to_500ms_and_is_configurable(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    assert window._run_options().progress_interval_ms == 500
+
+    window.progress_interval_spin.setValue(250)
+
+    assert window._run_options().progress_interval_ms == 250
+    assert window._settings_values()[PROGRESS_INTERVAL_KEY] == 250
+
+
+def _notify_parameter_row(window, key):
+    for row in range(window.notify_parameter_table.rowCount()):
+        item = window.notify_parameter_table.item(row, 1)
+        if item is not None and item.text() == key:
+            return row
+    raise AssertionError(f"missing notify parameter {key}")
+
+
+def test_notify_parameter_rename_and_disable_updates_preview(qtbot, tmp_path):
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+    row = _notify_parameter_row(window, "status")
+
+    window.notify_parameter_table.item(row, 2).setText("State")
+
+    assert "State: Test" in window.notify_preview.toPlainText()
+    status = next(
+        parameter
+        for parameter in window._notify_config.parameters
+        if parameter.key == "status"
+    )
+    assert status.label == "State"
+
+    window.notify_parameter_table.item(row, 0).setCheckState(Qt.Unchecked)
+
+    status = next(
+        parameter
+        for parameter in window._notify_config.parameters
+        if parameter.key == "status"
+    )
+    assert status.enabled is False
+    assert "State: Test" not in window.notify_preview.toPlainText()
+
+
+def test_notify_insert_example_fills_complete_message(qtbot, tmp_path):
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+
+    assert window.notify_message_edit.toPlainText() == ""
+
+    window.notify_example_button.click()
+
+    assert window.notify_message_edit.toPlainText() == (
+        NOTIFY_MESSAGE_EXAMPLE
+    )
+    assert window._notify_config.message_template == NOTIFY_MESSAGE_EXAMPLE
+    preview = window.notify_preview.toPlainText()
+    assert "MESSAGE\nTest: " in preview
+    assert "Progress: 100.0%" in preview
+
+
+def test_notify_test_button_uses_custom_http_config(qtbot, tmp_path, monkeypatch):
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+    captured = {}
+
+    def fake_send(config, context):
+        captured["config"] = config
+        captured["context"] = context
+        return True
+
+    monkeypatch.setattr(window._notify_client, "send", fake_send)
+    window.notify_method_combo.setCurrentText("PUT")
+    window.notify_url_edit.setText("https://example.test/{status}")
+    window.notify_body_edit.setPlainText('{"text": "{message}"}')
+
+    window._test_notification()
+
+    rendered = render_notify(
+        captured["config"],
+        captured["context"],
+    )
+    assert rendered.method == "PUT"
+    assert rendered.url == "https://example.test/Test"
+    assert '"text": "Status: Test' in rendered.body
+    assert "Sending test notification" in window.notify_status.text()
+
+
+def test_notify_sends_only_when_enabled(qtbot, tmp_path, monkeypatch):
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+    captured = []
+    monkeypatch.setattr(
+        window._notify_client,
+        "send",
+        lambda config, context: captured.append((config, context)) or True,
+    )
+    window._notify_config.enabled = False
+    window._notify_config.url = "https://example.test/hook"
+
+    window._send_run_notification(0, False)
+    assert captured == []
+
+    window._notify_config.enabled = True
+    window._send_run_notification(0, False)
+    assert len(captured) == 1
+    assert captured[0][1]["status"] == "Completed"
+
+
+def test_notify_hot_reload_applies_external_file_changes(qtbot, tmp_path):
+    path = tmp_path / "notify.json"
+    window = MainWindow(notify_path=path)
+    qtbot.addWidget(window)
+    window.notify_enabled_check.setChecked(True)
+    window.notify_url_edit.setText("https://old.example/hook")
+    window._save_notify_config()
+
+    changed = window._notify_config
+    changed.url = "https://new.example/hook"
+    NotifyStore(path).save(changed)
+    window._notify_last_mtime = 0
+    window._on_notify_file_changed()
+
+    assert window.notify_url_edit.text() == "https://new.example/hook"
+    assert "Reloaded" in window.notify_status.text()
+
+
+def test_run_notify_context_contains_ffmpeg_result_fields(qtbot, tmp_path):
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+    report = RunReport(
+        exit_code=1,
+        last_file="second.mp4",
+        last_progress={
+            "frame": "120",
+            "fps": "30",
+            "bitrate": "800kbits/s",
+            "total_size": "4096",
+            "out_time": "00:00:04.000000",
+            "speed": "2.5x",
+            "progress": "end",
+        },
+    )
+    window._worker = SimpleNamespace(
+        report=report,
+        log_lines=["Error opening input file"],
+        script="ffmpeg -i broken.mp4 out.mp4",
+        options=SimpleNamespace(shell="CMD"),
+    )
+
+    context = window._run_notify_context(1, False)
+
+    assert context["status"] == "Failed"
+    assert context["exit_code"] == "1"
+    assert context["current_file"] == "second.mp4"
+    assert context["frame"] == "120"
+    assert context["fps"] == "30"
+    assert context["speed"] == "2.5x"
+    assert context["ffmpeg_progress"] == "end"
+    assert context["command"] == "ffmpeg -i broken.mp4 out.mp4"
+    assert "Error opening" in context["error"]
+    window._worker = None
+
+
+def test_batch_run_shows_two_progress_bars(qtbot, tmp_path, monkeypatch):
+    source = tmp_path / "input"
+    source.mkdir()
+    (source / "one.mp4").write_bytes(b"x")
+    (source / "two.mp4").write_bytes(b"x")
+    monkeypatch.setattr(
+        "axiom.ui.main_window.run_script",
+        lambda *args, **kwargs: 0,
+    )
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+    window.input_edit.setText(str(source))
+    window.batch_ext.setText("mp4")
+    window.batch_check.setChecked(True)
+    window.script_view.setPlainText("ffmpeg -version")
+
+    window._run()
+
+    assert not window.total_progress_bar.isHidden()
+    assert window.progress_bar.format() == "File %p%"
+    qtbot.waitUntil(lambda: window._worker is None, timeout=2000)
+
+    window.batch_check.setChecked(False)
+    window.script_view.setPlainText("ffmpeg -version")
+    window._run()
+    assert window.total_progress_bar.isHidden()
+    assert window.progress_bar.format() == "%p%"
+    qtbot.waitUntil(lambda: window._worker is None, timeout=2000)
 
 
 def test_preview_launches_ffplay(qtbot, tmp_path, monkeypatch):

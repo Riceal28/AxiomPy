@@ -58,9 +58,11 @@ def main() -> int:
         (3, None, "subtitles"),
         (4, 0, "filters-video"),
         (4, 1, "filters-audio"),
-        (5, 0, "settings-config"),
-        (5, 1, "settings-file"),
-        (5, 2, "settings-system"),
+        (5, 0, "notify-http"),
+        (5, 1, "notify-message"),
+        (6, 0, "settings-config"),
+        (6, 1, "settings-file"),
+        (6, 2, "settings-system"),
     ]
     for top_index, sub_index, name in pages:
         window.tabs.setCurrentIndex(top_index)
@@ -69,7 +71,8 @@ def main() -> int:
                 1: window.video_tabs,
                 2: window.audio_tabs,
                 4: window.filter_tabs,
-                5: window.settings_tabs,
+                5: window.notify_tabs,
+                6: window.settings_tabs,
             }[top_index]
             active.setCurrentIndex(sub_index)
         app.processEvents()
@@ -86,6 +89,10 @@ def main() -> int:
         window.batch_list.setItem(row, 0, QTableWidgetItem(name))
         window.batch_list.setItem(row, 1, QTableWidgetItem(status))
     window.batch_status.setText("Completed 1 · Running 1")
+    window.progress_bar.setFormat("File %p%")
+    window.progress_bar.setValue(450)
+    window.total_progress_bar.show()
+    window.total_progress_bar.setValue(300)
     app.processEvents()
     _capture(window, args.output, "batch-queue")
 

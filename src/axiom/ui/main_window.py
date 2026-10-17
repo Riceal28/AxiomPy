@@ -5,9 +5,20 @@ from __future__ import annotations
 import os
 import re
 import threading
+import time
+from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QEvent, QObject, Qt, QThread, Signal
+from PySide6.QtCore import (
+    QByteArray,
+    QEvent,
+    QFileSystemWatcher,
+    QObject,
+    Qt,
+    QThread,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import QAction, QCloseEvent, QColor, QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -45,14 +56,29 @@ from PySide6.QtWidgets import (
 
 from axiom.core import controls
 from axiom.core.batch_scan import scan_batch_files
-from axiom.core.config import PresetStore, Settings
+from axiom.core.config import PresetStore, Settings, default_config_dir
 from axiom.core.generate import generate_runnable, resolve_controls
 from axiom.core.generate.context import build_context
 from axiom.core.generate.naming import OUTPUT_TOKEN_NAMES
+from axiom.core.notify import (
+    HTTP_METHODS,
+    NOTIFY_FILE_NAME,
+    NOTIFY_MESSAGE_EXAMPLE,
+    PARAMETER_DEFINITIONS,
+    NotifyConfig,
+    NotifyHeader,
+    NotifyParameter,
+    NotifyStore,
+    render_notify,
+)
 from axiom.core.runner import (
+    DEFAULT_PROGRESS_INTERVAL_MS,
+    MIN_PROGRESS_INTERVAL_MS,
+    RunReport,
     RunOptions,
     normalize_exit_code,
     preview_async,
+    probe_duration,
     run as run_script,
 )
 from axiom.core.script import Script
@@ -60,6 +86,7 @@ from axiom.core.state import AxiomState
 from axiom.core.toolpaths import resolve_tool_path
 
 from .control_rules import enabled_key, structural_scope
+from .notify_client import NotifyClient
 from .preset_locks import (
     PARAMETER_PRESET_KEYS,
     PRESET_LOCKED_KEYS,
@@ -87,8 +114,9 @@ FONT_SIZE_OPTIONS = tuple(range(8, 17))
 FONT_SIZE_KEY = "Ui.FontSize"
 SAVE_WORKSPACE_KEY = "Ui.SaveWorkspaceOnExit"
 MOUSE_WHEEL_KEY = "Ui.MouseWheelAdjust"
+PROGRESS_INTERVAL_KEY = "Ui.ProgressUpdateIntervalMs"
 WORKSPACE_KEY = "Ui.Workspace"
-WORKSPACE_SCHEMA = 1
+WORKSPACE_SCHEMA = 2
 
 SETTINGS_KEYS = (
     "Configure.FFmpegPath_Text",
@@ -144,6 +172,7 @@ class PathDropEdit(QLineEdit):
 class _RunWorker(QThread):
     log = Signal(str)
     progress = Signal(float, str)
+    total_progress = Signal(float, str)
     done = Signal(int, bool)
 
     def __init__(
@@ -151,24 +180,48 @@ class _RunWorker(QThread):
         script: str,
         options: RunOptions,
         cancel: threading.Event,
+        *,
+        duration: float | None = None,
+        input_path: Path | None = None,
+        ffprobe: str = "ffprobe",
     ) -> None:
         super().__init__()
         self.script = script
         self.options = options
         self.cancel = cancel
+        self.duration = duration
+        self.input_path = input_path
+        self.ffprobe = ffprobe
+        self.report = RunReport()
+        self.log_lines: list[str] = []
+
+    def _emit_log(self, line: str) -> None:
+        self.log_lines.append(line)
+        self.log.emit(line)
 
     def run(self) -> None:
         try:
+            if self.duration is None and self.input_path is not None:
+                if self.input_path.is_file():
+                    self.duration = probe_duration(
+                        self.input_path,
+                        self.ffprobe,
+                    )
             code = run_script(
                 self.script,
                 self.options,
-                on_log=self.log.emit,
+                on_log=self._emit_log,
                 on_progress=self.progress.emit,
+                on_total_progress=self.total_progress.emit,
                 cancel=self.cancel,
+                duration=self.duration,
+                report=self.report,
             )
         except Exception as error:
             self.log.emit(f"Failed to run process: {type(error).__name__}: {error}")
             code = 1
+            self.report.exit_code = code
+            self.report.finished_at = time.time()
         code = normalize_exit_code(code)
         self.done.emit(code, self.cancel.is_set())
 
@@ -193,7 +246,7 @@ class _WheelGuard(QObject):
 class MainWindow(QMainWindow):
     """Operational shell around the parity-tested core engine."""
 
-    def __init__(self) -> None:
+    def __init__(self, notify_path: Path | None = None) -> None:
         super().__init__()
         self.state = AxiomState()
         self.state.set("Main.ExternalConsole_IsChecked", False)
@@ -218,6 +271,7 @@ class MainWindow(QMainWindow):
         self._batch_current_row = -1
         self._last_error_hint = ""
         self._font_size = DEFAULT_FONT_SIZE
+        self._progress_interval_ms = DEFAULT_PROGRESS_INTERVAL_MS
         self._save_workspace_on_exit = True
         self._mouse_wheel_adjust = False
         self._preset_locked = False
@@ -225,6 +279,26 @@ class MainWindow(QMainWindow):
         self._initial_parameter_values: dict[str, object] = {}
         self._settings_path: Path | None = None
         self._persist_on_close = False
+        self._notify_store = NotifyStore(
+            notify_path
+            or (default_config_dir() / NOTIFY_FILE_NAME)
+        )
+        self._notify_config = self._notify_store.load()
+        self._notify_loading = False
+        self._notify_last_mtime: float | None = None
+        self._notify_client = NotifyClient(self)
+        self._notify_client.result.connect(self._on_notify_result)
+        self._notify_save_timer = QTimer(self)
+        self._notify_save_timer.setSingleShot(True)
+        self._notify_save_timer.setInterval(450)
+        self._notify_save_timer.timeout.connect(self._save_notify_config)
+        self._notify_watcher = QFileSystemWatcher(self)
+        self._notify_watcher.fileChanged.connect(
+            self._on_notify_file_changed
+        )
+        self._notify_watcher.directoryChanged.connect(
+            self._on_notify_file_changed
+        )
         self._wheel_guard = _WheelGuard(self)
         self._base_tooltips: dict[str, str] = {}
 
@@ -235,6 +309,8 @@ class MainWindow(QMainWindow):
         self.state.set("Format.Format_Container_SelectedItem", "mp4")
         self.state.set("Format.Format_Container_SelectedIndex", 2)
         self._build_ui()
+        self._populate_notify_ui()
+        self._update_notify_watcher()
         self._load_presets()
         self._refresh_controls(full=True)
         self.state.set("Audio.Audio_Stream_SelectedItem", "all")
@@ -260,6 +336,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_audio_tab(), "Audio")
         self.tabs.addTab(self._build_subtitles_tab(), "Subtitles")
         self.tabs.addTab(self._build_filters_tab(), "Filters")
+        self.tabs.addTab(self._build_notify_tab(), "Notify")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
         layout.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
@@ -472,8 +549,17 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 1000)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
-        self.progress_bar.setFixedWidth(220)
+        self.progress_bar.setFixedWidth(180)
+        self.progress_bar.setToolTip("Current file progress")
         status.addPermanentWidget(self.progress_bar)
+        self.total_progress_bar = QProgressBar(self)
+        self.total_progress_bar.setRange(0, 1000)
+        self.total_progress_bar.setValue(0)
+        self.total_progress_bar.setFormat("Total %p%")
+        self.total_progress_bar.setFixedWidth(180)
+        self.total_progress_bar.setToolTip("Batch total progress")
+        self.total_progress_bar.hide()
+        status.addPermanentWidget(self.total_progress_bar)
         self.cancel_button = QPushButton("Cancel", self)
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self._cancel_run)
@@ -1213,6 +1299,550 @@ class MainWindow(QMainWindow):
         tabs.addTab(audio, "Audio")
         return tabs
 
+    def _notify_page(self) -> tuple[QScrollArea, QVBoxLayout]:
+        content = QWidget(self)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(8, 8, 8, 8)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+        return scroll, layout
+
+    def _build_notify_tab(self) -> QWidget:
+        tabs = QTabWidget(self)
+        self.notify_tabs = tabs
+
+        http, layout = self._notify_page()
+        connection = QGroupBox("HTTP", self)
+        connection_form = QFormLayout(connection)
+        self.notify_enabled_check = QCheckBox(
+            "Enable notifications after each run",
+            self,
+        )
+        self.notify_enabled_check.toggled.connect(
+            self._on_notify_ui_changed
+        )
+        connection_form.addRow(self.notify_enabled_check)
+        self.notify_hot_reload_check = QCheckBox(
+            "Hot reload notify.json",
+            self,
+        )
+        self.notify_hot_reload_check.setToolTip(
+            "Watch notify.json and apply external edits without restarting. "
+            "Edits in this page are also written back after a short delay."
+        )
+        self.notify_hot_reload_check.toggled.connect(
+            self._on_notify_ui_changed
+        )
+        connection_form.addRow(self.notify_hot_reload_check)
+        self.notify_method_combo = QComboBox(self)
+        self.notify_method_combo.addItems(list(HTTP_METHODS))
+        self.notify_method_combo.currentTextChanged.connect(
+            self._on_notify_ui_changed
+        )
+        connection_form.addRow("Method", self.notify_method_combo)
+        self.notify_url_edit = QLineEdit(self)
+        self.notify_url_edit.setPlaceholderText(
+            "https://example.test/webhook/{input_name}"
+        )
+        self.notify_url_edit.textChanged.connect(self._on_notify_ui_changed)
+        connection_form.addRow("URL", self.notify_url_edit)
+        self.notify_timeout_spin = QSpinBox(self)
+        self.notify_timeout_spin.setRange(1000, 120000)
+        self.notify_timeout_spin.setSingleStep(1000)
+        self.notify_timeout_spin.setSuffix(" ms")
+        self.notify_timeout_spin.valueChanged.connect(
+            self._on_notify_ui_changed
+        )
+        connection_form.addRow("Timeout", self.notify_timeout_spin)
+        layout.addWidget(connection)
+
+        headers = QGroupBox("Headers", self)
+        headers_layout = QVBoxLayout(headers)
+        self.notify_header_table = QTableWidget(0, 3, self)
+        self.notify_header_table.setHorizontalHeaderLabels(
+            ["On", "Header", "Value"]
+        )
+        self.notify_header_table.verticalHeader().setVisible(False)
+        self.notify_header_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.Fixed
+        )
+        self.notify_header_table.setColumnWidth(0, 42)
+        self.notify_header_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.Interactive
+        )
+        self.notify_header_table.setColumnWidth(1, 190)
+        self.notify_header_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.Stretch
+        )
+        self.notify_header_table.setMinimumHeight(150)
+        self.notify_header_table.itemChanged.connect(
+            self._on_notify_ui_changed
+        )
+        headers_layout.addWidget(self.notify_header_table)
+        header_buttons = QHBoxLayout()
+        add_header = QPushButton("Add Header", self)
+        add_header.clicked.connect(self._add_notify_header)
+        remove_header = QPushButton("Remove Selected", self)
+        remove_header.clicked.connect(self._remove_notify_header)
+        header_buttons.addWidget(add_header)
+        header_buttons.addWidget(remove_header)
+        header_buttons.addStretch(1)
+        headers_layout.addLayout(header_buttons)
+        layout.addWidget(headers)
+
+        body_group = QGroupBox("Body", self)
+        body_layout = QVBoxLayout(body_group)
+        self.notify_body_edit = QTextEdit(self)
+        self.notify_body_edit.setAcceptRichText(False)
+        self.notify_body_edit.setMinimumHeight(170)
+        self.notify_body_edit.setPlaceholderText(
+            '{"message": {message_json}, "status": "{status}"}'
+        )
+        self.notify_body_edit.textChanged.connect(
+            self._on_notify_ui_changed
+        )
+        body_layout.addWidget(self.notify_body_edit)
+        layout.addWidget(body_group)
+
+        actions = QHBoxLayout()
+        self.notify_test_button = QPushButton("Test Notification", self)
+        self.notify_test_button.clicked.connect(self._test_notification)
+        self.notify_save_button = QPushButton("Save Config", self)
+        self.notify_save_button.clicked.connect(self._save_notify_config)
+        self.notify_reload_button = QPushButton("Reload", self)
+        self.notify_reload_button.clicked.connect(self._reload_notify_config)
+        actions.addWidget(self.notify_test_button)
+        actions.addWidget(self.notify_save_button)
+        actions.addWidget(self.notify_reload_button)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+        self.notify_status = QLabel("Notify is disabled", self)
+        self.notify_status.setWordWrap(True)
+        layout.addWidget(self.notify_status)
+        self.notify_config_path_label = QLabel("", self)
+        self.notify_config_path_label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.notify_config_path_label.setWordWrap(True)
+        layout.addWidget(self.notify_config_path_label)
+        layout.addStretch(1)
+        tabs.addTab(http, "HTTP")
+
+        message, layout = self._notify_page()
+        template_group = QGroupBox("Message", self)
+        template_layout = QVBoxLayout(template_group)
+        hint = QLabel(
+            "Use {key} placeholders such as {status}, {exit_code}, "
+            "{input_name}, {message} and {message_json}. Click Insert Example "
+            "for a complete template, or leave the field empty to build the "
+            "message from enabled parameters. Renaming a parameter changes "
+            "the automatic message and {params_json}, while template keys "
+            "stay stable.",
+            self,
+        )
+        hint.setWordWrap(True)
+        template_layout.addWidget(hint)
+        self.notify_example_button = QPushButton("Insert Example", self)
+        self.notify_example_button.setToolTip(
+            "Fill the message with a complete template using the built-in "
+            "placeholders."
+        )
+        self.notify_example_button.clicked.connect(
+            self._insert_notify_message_example
+        )
+        example_layout = QHBoxLayout()
+        example_layout.addWidget(self.notify_example_button)
+        example_layout.addStretch(1)
+        template_layout.addLayout(example_layout)
+        self.notify_message_edit = QTextEdit(self)
+        self.notify_message_edit.setAcceptRichText(False)
+        self.notify_message_edit.setMinimumHeight(170)
+        self.notify_message_edit.setPlaceholderText(NOTIFY_MESSAGE_EXAMPLE)
+        self.notify_message_edit.textChanged.connect(
+            self._on_notify_ui_changed
+        )
+        template_layout.addWidget(self.notify_message_edit)
+        layout.addWidget(template_group)
+
+        parameters = QGroupBox("Parameters", self)
+        parameters_layout = QVBoxLayout(parameters)
+        self.notify_parameter_table = QTableWidget(0, 4, self)
+        self.notify_parameter_table.setHorizontalHeaderLabels(
+            ["On", "Parameter", "Display Name", "Description"]
+        )
+        self.notify_parameter_table.verticalHeader().setVisible(False)
+        self.notify_parameter_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.Fixed
+        )
+        self.notify_parameter_table.setColumnWidth(0, 42)
+        self.notify_parameter_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.Interactive
+        )
+        self.notify_parameter_table.setColumnWidth(1, 130)
+        self.notify_parameter_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.Interactive
+        )
+        self.notify_parameter_table.setColumnWidth(2, 180)
+        self.notify_parameter_table.horizontalHeader().setSectionResizeMode(
+            3, QHeaderView.Stretch
+        )
+        self.notify_parameter_table.setMinimumHeight(430)
+        self.notify_parameter_table.itemChanged.connect(
+            self._on_notify_ui_changed
+        )
+        parameters_layout.addWidget(self.notify_parameter_table)
+        reset_names = QPushButton("Reset Names", self)
+        reset_names.clicked.connect(self._reset_notify_parameter_names)
+        parameters_layout.addWidget(reset_names)
+        layout.addWidget(parameters)
+
+        preview_group = QGroupBox("Preview", self)
+        preview_layout = QVBoxLayout(preview_group)
+        self.notify_preview = QTextEdit(self)
+        self.notify_preview.setReadOnly(True)
+        self.notify_preview.setMinimumHeight(220)
+        preview_layout.addWidget(self.notify_preview)
+        layout.addWidget(preview_group)
+        layout.addStretch(1)
+        tabs.addTab(message, "Message")
+        return tabs
+
+    def _add_notify_header(self) -> None:
+        row = self.notify_header_table.rowCount()
+        self.notify_header_table.insertRow(row)
+        enabled = QTableWidgetItem("")
+        enabled.setFlags(
+            Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        )
+        enabled.setCheckState(Qt.Checked)
+        self.notify_header_table.setItem(row, 0, enabled)
+        self.notify_header_table.setItem(
+            row, 1, QTableWidgetItem("")
+        )
+        self.notify_header_table.setItem(
+            row, 2, QTableWidgetItem("")
+        )
+        self._on_notify_ui_changed()
+
+    def _remove_notify_header(self) -> None:
+        rows = sorted(
+            {
+                index.row()
+                for index in self.notify_header_table.selectedIndexes()
+            },
+            reverse=True,
+        )
+        for row in rows:
+            self.notify_header_table.removeRow(row)
+        if rows:
+            self._on_notify_ui_changed()
+
+    def _reset_notify_parameter_names(self) -> None:
+        self._notify_loading = True
+        try:
+            for row, definition in enumerate(PARAMETER_DEFINITIONS):
+                if row >= self.notify_parameter_table.rowCount():
+                    break
+                item = self.notify_parameter_table.item(row, 2)
+                if item is not None:
+                    item.setText(definition.label)
+        finally:
+            self._notify_loading = False
+        self._on_notify_ui_changed()
+
+    def _insert_notify_message_example(self) -> None:
+        self.notify_message_edit.setPlainText(NOTIFY_MESSAGE_EXAMPLE)
+
+    def _populate_notify_ui(self) -> None:
+        if not hasattr(self, "notify_parameter_table"):
+            return
+        config = self._notify_config
+        self._notify_loading = True
+        try:
+            self.notify_enabled_check.setChecked(config.enabled)
+            self.notify_hot_reload_check.setChecked(config.hot_reload)
+            self.notify_method_combo.setCurrentText(
+                config.method if config.method in HTTP_METHODS else "POST"
+            )
+            self.notify_url_edit.setText(config.url)
+            self.notify_timeout_spin.setValue(config.timeout_ms)
+            self.notify_body_edit.setPlainText(config.body)
+            self.notify_message_edit.setPlainText(config.message_template)
+
+            self.notify_header_table.setRowCount(0)
+            for header in config.headers:
+                row = self.notify_header_table.rowCount()
+                self.notify_header_table.insertRow(row)
+                enabled = QTableWidgetItem("")
+                enabled.setFlags(
+                    Qt.ItemIsUserCheckable
+                    | Qt.ItemIsEnabled
+                    | Qt.ItemIsSelectable
+                )
+                enabled.setCheckState(
+                    Qt.Checked if header.enabled else Qt.Unchecked
+                )
+                self.notify_header_table.setItem(row, 0, enabled)
+                self.notify_header_table.setItem(
+                    row, 1, QTableWidgetItem(header.name)
+                )
+                self.notify_header_table.setItem(
+                    row, 2, QTableWidgetItem(header.value)
+                )
+
+            self.notify_parameter_table.setRowCount(0)
+            for parameter in config.parameters:
+                definition = next(
+                    (
+                        item
+                        for item in PARAMETER_DEFINITIONS
+                        if item.key == parameter.key
+                    ),
+                    None,
+                )
+                row = self.notify_parameter_table.rowCount()
+                self.notify_parameter_table.insertRow(row)
+                enabled = QTableWidgetItem("")
+                enabled.setFlags(
+                    Qt.ItemIsUserCheckable
+                    | Qt.ItemIsEnabled
+                    | Qt.ItemIsSelectable
+                )
+                enabled.setCheckState(
+                    Qt.Checked if parameter.enabled else Qt.Unchecked
+                )
+                self.notify_parameter_table.setItem(row, 0, enabled)
+                key_item = QTableWidgetItem(parameter.key)
+                key_item.setFlags(
+                    Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                )
+                self.notify_parameter_table.setItem(row, 1, key_item)
+                self.notify_parameter_table.setItem(
+                    row,
+                    2,
+                    QTableWidgetItem(parameter.resolved_label()),
+                )
+                description = QTableWidgetItem(
+                    definition.description if definition else ""
+                )
+                description.setFlags(
+                    Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                )
+                self.notify_parameter_table.setItem(
+                    row, 3, description
+                )
+        finally:
+            self._notify_loading = False
+        self.notify_config_path_label.setText(
+            f"Config: {self._notify_store.path}"
+        )
+        self._notify_last_mtime = self._notify_mtime()
+        self.notify_status.setText(
+            "Notifications enabled"
+            if config.enabled
+            else "Notify is disabled"
+        )
+        self._update_notify_preview()
+        self._update_notify_watcher()
+
+    def _notify_mtime(self) -> float | None:
+        try:
+            return self._notify_store.path.stat().st_mtime_ns
+        except OSError:
+            return None
+
+    def _notify_config_from_widgets(self) -> NotifyConfig:
+        headers: list[NotifyHeader] = []
+        for row in range(self.notify_header_table.rowCount()):
+            enabled_item = self.notify_header_table.item(row, 0)
+            name_item = self.notify_header_table.item(row, 1)
+            value_item = self.notify_header_table.item(row, 2)
+            headers.append(
+                NotifyHeader(
+                    enabled=(
+                        enabled_item is None
+                        or enabled_item.checkState() == Qt.Checked
+                    ),
+                    name=name_item.text() if name_item else "",
+                    value=value_item.text() if value_item else "",
+                )
+            )
+
+        parameters: list[NotifyParameter] = []
+        for row in range(self.notify_parameter_table.rowCount()):
+            enabled_item = self.notify_parameter_table.item(row, 0)
+            key_item = self.notify_parameter_table.item(row, 1)
+            label_item = self.notify_parameter_table.item(row, 2)
+            if key_item is None:
+                continue
+            parameters.append(
+                NotifyParameter(
+                    key=key_item.text(),
+                    label=label_item.text() if label_item else "",
+                    enabled=(
+                        enabled_item is None
+                        or enabled_item.checkState() == Qt.Checked
+                    ),
+                )
+            )
+        return NotifyConfig(
+            enabled=self.notify_enabled_check.isChecked(),
+            hot_reload=self.notify_hot_reload_check.isChecked(),
+            method=self.notify_method_combo.currentText(),
+            url=self.notify_url_edit.text(),
+            timeout_ms=self.notify_timeout_spin.value(),
+            headers=headers,
+            body=self.notify_body_edit.toPlainText(),
+            message_template=self.notify_message_edit.toPlainText(),
+            parameters=parameters,
+        )
+
+    def _on_notify_ui_changed(self, *_args) -> None:
+        if self._notify_loading:
+            return
+        self._notify_config = self._notify_config_from_widgets()
+        self._update_notify_preview()
+        self._update_notify_watcher()
+        if self._notify_config.hot_reload:
+            self._notify_save_timer.start()
+        else:
+            self._notify_save_timer.stop()
+
+    def _update_notify_watcher(self) -> None:
+        wanted = [str(self._notify_store.path.parent)]
+        if self._notify_store.path.exists():
+            wanted.append(str(self._notify_store.path))
+        if not self._notify_config.hot_reload:
+            wanted = []
+        existing = set(self._notify_watcher.directories())
+        existing.update(self._notify_watcher.files())
+        remove = [path for path in existing if path not in wanted]
+        add = [path for path in wanted if path not in existing]
+        if remove:
+            self._notify_watcher.removePaths(remove)
+        if add:
+            self._notify_watcher.addPaths(add)
+
+    def _on_notify_file_changed(self, *_args) -> None:
+        if self._notify_loading or not self._notify_config.hot_reload:
+            return
+        mtime = self._notify_mtime()
+        if mtime is None or mtime == self._notify_last_mtime:
+            return
+        self._notify_config = self._notify_store.load()
+        self._populate_notify_ui()
+        self.notify_status.setText(
+            f"Reloaded {self._notify_store.path.name}"
+        )
+
+    def _save_notify_config(self) -> None:
+        if not hasattr(self, "notify_header_table"):
+            return
+        if not self._notify_loading:
+            self._notify_config = self._notify_config_from_widgets()
+        try:
+            self._notify_store.save(self._notify_config)
+        except OSError as error:
+            self.notify_status.setText(f"Could not save notify.json: {error}")
+            return
+        self._notify_last_mtime = self._notify_mtime()
+        self._update_notify_watcher()
+        self.notify_status.setText(
+            f"Saved {self._notify_store.path}"
+        )
+
+    def _reload_notify_config(self) -> None:
+        self._notify_config = self._notify_store.load()
+        self._populate_notify_ui()
+        self.notify_status.setText("Notify config reloaded")
+
+    def _notify_test_context(self) -> dict[str, str]:
+        input_text = self.input_edit.text()
+        context = build_context(self.state)
+        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        return {
+            "status": "Test",
+            "exit_code": "0",
+            "input": input_text,
+            "input_name": Path(input_text).name if input_text else "",
+            "output": context.output_path,
+            "output_name": Path(context.output_path).name,
+            "elapsed": "0.00",
+            "started_at": timestamp,
+            "finished_at": timestamp,
+            "duration": "0",
+            "current_file": "",
+            "file_progress": "100.0%",
+            "total_progress": "100.0%",
+            "time": "00:00:00.000000",
+            "frame": "0",
+            "fps": "0",
+            "bitrate": "0",
+            "size": "0",
+            "speed": "0x",
+            "ffmpeg_progress": "end",
+            "command": _inline_text(self.script_view.toPlainText()),
+            "shell": str(
+                self.state.get("Configure.Shell_SelectedItem") or "CMD"
+            ),
+            "cancelled": "false",
+            "batch": "false",
+            "batch_count": "0",
+            "batch_completed": "0",
+            "batch_failed": "0",
+            "batch_cancelled": "0",
+            "error": "",
+            "log": "Test notification from AxiomPy",
+        }
+
+    def _update_notify_preview(self) -> None:
+        if not hasattr(self, "notify_preview"):
+            return
+        rendered = render_notify(
+            self._notify_config,
+            self._notify_test_context(),
+        )
+        header_lines = "\n".join(
+            f"{name}: {value}" for name, value in rendered.headers
+        )
+        self.notify_preview.setPlainText(
+            f"MESSAGE\n{rendered.message}\n\n"
+            f"REQUEST\n{rendered.method} {rendered.url}\n"
+            f"{header_lines}\n\nBODY\n{rendered.body}"
+        )
+
+    def _test_notification(self) -> None:
+        self._notify_config = self._notify_config_from_widgets()
+        if not self._notify_config.url.strip():
+            self.notify_status.setText("Enter a Notify URL first")
+            return
+        sent = self._notify_client.send(
+            self._notify_config,
+            self._notify_test_context(),
+        )
+        if sent:
+            self.notify_status.setText("Sending test notification…")
+
+    def _on_notify_result(
+        self,
+        ok: bool,
+        status: int,
+        body: str,
+        error: str,
+    ) -> None:
+        if ok:
+            detail = f"HTTP {status}" if status else "HTTP OK"
+            text = f"Notification sent ({detail})"
+        else:
+            detail = error or f"HTTP {status or 'error'}"
+            response = body.strip().replace("\n", " ")[:180]
+            if response:
+                detail += f": {response}"
+            text = f"Notification failed: {detail}"
+        self.notify_status.setText(text)
+        self.status_label.setText(text)
+
     def _build_settings_tab(self) -> QWidget:
         tabs = QTabWidget(self)
         self.settings_tabs = tabs
@@ -1336,6 +1966,22 @@ class MainWindow(QMainWindow):
             self._on_mouse_wheel_adjust
         )
         interface_form.addRow(self.wheel_adjust_check)
+        self.progress_interval_spin = QSpinBox(self)
+        self.progress_interval_spin.setRange(
+            MIN_PROGRESS_INTERVAL_MS,
+            5000,
+        )
+        self.progress_interval_spin.setSingleStep(100)
+        self.progress_interval_spin.setSuffix(" ms")
+        self.progress_interval_spin.setValue(self._progress_interval_ms)
+        self.progress_interval_spin.setToolTip(
+            "How often FFmpeg writes progress and the status bar refreshes. "
+            "The default is 500 ms."
+        )
+        self.progress_interval_spin.valueChanged.connect(
+            self._on_progress_interval
+        )
+        interface_form.addRow("Progress Update", self.progress_interval_spin)
         form.addRow(interface)
 
         save_preset = QPushButton("Save User Preset…", self)
@@ -2281,6 +2927,16 @@ class MainWindow(QMainWindow):
             else "Mouse-wheel value adjustment disabled"
         )
 
+    def _on_progress_interval(self, value: int) -> None:
+        self._progress_interval_ms = max(
+            MIN_PROGRESS_INTERVAL_MS,
+            int(value),
+        )
+        if not self._loading:
+            self.status_label.setText(
+                f"Progress refresh set to {self._progress_interval_ms} ms"
+            )
+
     def _workspace_payload(self) -> dict:
         return {
             "schema": WORKSPACE_SCHEMA,
@@ -2292,6 +2948,7 @@ class MainWindow(QMainWindow):
                 "video": self.video_tabs.currentIndex(),
                 "audio": self.audio_tabs.currentIndex(),
                 "filters": self.filter_tabs.currentIndex(),
+                "notify": self.notify_tabs.currentIndex(),
                 "settings": self.settings_tabs.currentIndex(),
             },
             "script_text": self.script_view.toPlainText(),
@@ -2300,7 +2957,10 @@ class MainWindow(QMainWindow):
         }
 
     def _restore_workspace(self, payload: object) -> bool:
-        if not isinstance(payload, dict) or payload.get("schema") != WORKSPACE_SCHEMA:
+        if not isinstance(payload, dict):
+            return False
+        schema = payload.get("schema")
+        if schema not in (1, WORKSPACE_SCHEMA):
             return False
 
         state_values = payload.get("state")
@@ -2335,12 +2995,16 @@ class MainWindow(QMainWindow):
                 ("video", self.video_tabs),
                 ("audio", self.audio_tabs),
                 ("filters", self.filter_tabs),
+                ("notify", self.notify_tabs),
                 ("settings", self.settings_tabs),
             ):
                 try:
                     index = int(tabs.get(key, 0))
                 except (TypeError, ValueError):
                     continue
+                if schema == 1 and key == "top" and index >= 5:
+                    # Notify was inserted between Filters and Settings.
+                    index += 1
                 if 0 <= index < widget.count():
                     widget.setCurrentIndex(index)
 
@@ -2364,6 +3028,7 @@ class MainWindow(QMainWindow):
         values[FONT_SIZE_KEY] = self._font_size
         values[SAVE_WORKSPACE_KEY] = bool(self._save_workspace_on_exit)
         values[MOUSE_WHEEL_KEY] = bool(self._mouse_wheel_adjust)
+        values[PROGRESS_INTERVAL_KEY] = int(self._progress_interval_ms)
         if self._save_workspace_on_exit:
             values[WORKSPACE_KEY] = self._workspace_payload()
         return values
@@ -2401,6 +3066,22 @@ class MainWindow(QMainWindow):
         self.wheel_adjust_check.blockSignals(True)
         self.wheel_adjust_check.setChecked(self._mouse_wheel_adjust)
         self.wheel_adjust_check.blockSignals(False)
+        try:
+            progress_interval = int(
+                settings.get(
+                    PROGRESS_INTERVAL_KEY,
+                    DEFAULT_PROGRESS_INTERVAL_MS,
+                )
+            )
+        except (TypeError, ValueError):
+            progress_interval = DEFAULT_PROGRESS_INTERVAL_MS
+        self._progress_interval_ms = max(
+            MIN_PROGRESS_INTERVAL_MS,
+            min(5000, progress_interval),
+        )
+        self.progress_interval_spin.blockSignals(True)
+        self.progress_interval_spin.setValue(self._progress_interval_ms)
+        self.progress_interval_spin.blockSignals(False)
         self._save_workspace_on_exit = bool(
             settings.get(SAVE_WORKSPACE_KEY, True)
         )
@@ -2487,6 +3168,7 @@ class MainWindow(QMainWindow):
             show_console=bool(
                 self.state.get("Main.ExternalConsole_IsChecked")
             ),
+            progress_interval_ms=int(self._progress_interval_ms),
         )
 
     def _console_title(self) -> str:
@@ -2515,15 +3197,52 @@ class MainWindow(QMainWindow):
         self.log_view.clear()
         self._last_error_hint = ""
         self._cancel_event.clear()
-        if self.batch_check.isChecked():
+        is_batch = self.batch_check.isChecked()
+        if is_batch:
             self._reset_batch_status()
         self.progress_bar.setValue(0)
+        self.total_progress_bar.setValue(0)
+        if is_batch:
+            self.progress_bar.setFormat("File %p%")
+            self.progress_bar.setToolTip("Current file progress")
+            self.total_progress_bar.show()
+        else:
+            self.progress_bar.setFormat("%p%")
+            self.progress_bar.setToolTip("Current file progress")
+            self.total_progress_bar.hide()
         self.run_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.status_label.setText("Running…")
-        self._worker = _RunWorker(script, self._run_options(), self._cancel_event)
+        input_path = None
+        if not is_batch:
+            candidate = Path(self.input_edit.text())
+            if candidate.is_file():
+                input_path = candidate
+        ffprobe = str(self.state.get("Configure.FFprobePath_Text") or "")
+        if not ffprobe or ffprobe == "<auto>":
+            ffprobe = str(resolve_tool_path("<auto>", "ffprobe") or "ffprobe")
+        batch_files: list[Path] = []
+        if is_batch:
+            for row in range(self.batch_list.rowCount()):
+                item = self.batch_list.item(row, 0)
+                if item is None:
+                    continue
+                value = item.data(Qt.UserRole)
+                if value:
+                    batch_files.append(Path(str(value)))
+        options = self._run_options()
+        options.batch_files = batch_files
+        options.ffprobe = ffprobe
+        self._worker = _RunWorker(
+            script,
+            options,
+            self._cancel_event,
+            input_path=input_path,
+            ffprobe=ffprobe,
+        )
         self._worker.log.connect(self._on_log)
         self._worker.progress.connect(self._on_progress)
+        self._worker.total_progress.connect(self._on_total_progress)
         self._worker.done.connect(self._on_run_done)
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.start()
@@ -2541,8 +3260,32 @@ class MainWindow(QMainWindow):
         if self.batch_check.isChecked():
             self._handle_batch_log(line)
 
-    def _on_progress(self, fraction: float, _line: str) -> None:
+    def _on_progress(self, fraction: float, file_name: str) -> None:
         self.progress_bar.setValue(max(0, min(1000, round(fraction * 1000))))
+        if self.batch_check.isChecked() and file_name:
+            self.progress_bar.setToolTip(f"Current file: {file_name}")
+            self._track_batch_progress_file(file_name)
+
+    def _on_total_progress(self, fraction: float, _file_name: str) -> None:
+        self.total_progress_bar.setValue(
+            max(0, min(1000, round(fraction * 1000)))
+        )
+
+    def _track_batch_progress_file(self, file_name: str) -> None:
+        row = self._batch_row_for_name(file_name)
+        if row < 0:
+            return
+        if self._batch_current_row >= 0 and self._batch_current_row != row:
+            previous = self.batch_list.item(self._batch_current_row, 1)
+            if previous is not None and previous.text() == "Running":
+                self._set_batch_row_status(
+                    self._batch_current_row,
+                    "Completed",
+                )
+        self._batch_current_row = row
+        current = self.batch_list.item(row, 1)
+        if current is not None and current.text() in ("Pending", "Running"):
+            self._set_batch_row_status(row, "Running")
 
     def _cancel_run(self) -> None:
         if self._worker and self._worker.isRunning():
@@ -2553,6 +3296,18 @@ class MainWindow(QMainWindow):
     def _on_run_done(self, code: int, cancelled: bool) -> None:
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
+        if (
+            self.batch_check.isChecked()
+            and self._batch_current_row < 0
+            and not cancelled
+            and code != 0
+        ):
+            for row in range(self.batch_list.rowCount()):
+                item = self.batch_list.item(row, 1)
+                if item is not None and item.text() == "Pending":
+                    self._set_batch_row_status(row, "Failed")
+                    self._batch_current_row = row
+                    break
         if self.batch_check.isChecked() and self._batch_current_row >= 0:
             item = self.batch_list.item(self._batch_current_row, 1)
             if item is not None and item.text() == "Running":
@@ -2566,6 +3321,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Cancelled")
         elif code == 0:
             self.progress_bar.setValue(1000)
+            self.total_progress_bar.setValue(1000)
             self.status_label.setText("Completed")
         else:
             self.status_label.setText(
@@ -2573,6 +3329,119 @@ class MainWindow(QMainWindow):
                 or f"Failed with exit code {code}"
             )
         self.log_view.append(f"\nProcess exited with code {code}")
+        self._send_run_notification(code, cancelled)
+
+    def _format_seconds(self, value: float | None) -> str:
+        return "" if value is None else f"{float(value):.3f}"
+
+    def _batch_status_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for row in range(self.batch_list.rowCount()):
+            item = self.batch_list.item(row, 1)
+            status = item.text() if item is not None else "Pending"
+            counts[status] = counts.get(status, 0) + 1
+        return counts
+
+    def _notify_error_text(self, worker: _RunWorker | None) -> str:
+        if self._last_error_hint:
+            return self._last_error_hint
+        if worker is None:
+            return ""
+        matches = [
+            line
+            for line in worker.log_lines
+            if re.search(
+                r"\b(error|failed|invalid|no such|could not)\b",
+                line,
+                re.IGNORECASE,
+            )
+        ]
+        return "\n".join(matches[-10:])
+
+    def _run_notify_context(
+        self,
+        code: int,
+        cancelled: bool,
+    ) -> dict[str, str]:
+        worker = self._worker
+        report = worker.report if worker is not None else RunReport()
+        stats = dict(report.last_progress)
+        context = build_context(self.state)
+        started = report.started_at
+        finished = report.finished_at or started
+        elapsed = max(0.0, finished - started) if started else 0.0
+        counts = self._batch_status_counts()
+        status = (
+            "Cancelled"
+            if cancelled
+            else ("Completed" if code == 0 else "Failed")
+        )
+        input_text = self.input_edit.text()
+        output_path = str(context.output_path)
+        script = worker.script if worker is not None else ""
+        shell = (
+            worker.options.shell
+            if worker is not None
+            else str(self.state.get("Configure.Shell_SelectedItem") or "CMD")
+        )
+        log_lines = worker.log_lines if worker is not None else []
+        return {
+            "status": status,
+            "exit_code": str(code),
+            "input": input_text,
+            "input_name": Path(input_text).name if input_text else "",
+            "output": output_path,
+            "output_name": Path(output_path).name,
+            "elapsed": f"{elapsed:.2f}",
+            "started_at": (
+                datetime.fromtimestamp(started).astimezone().isoformat(
+                    timespec="seconds"
+                )
+                if started
+                else ""
+            ),
+            "finished_at": (
+                datetime.fromtimestamp(finished).astimezone().isoformat(
+                    timespec="seconds"
+                )
+                if finished
+                else ""
+            ),
+            "duration": self._format_seconds(report.duration),
+            "current_file": report.last_file,
+            "file_progress": f"{self.progress_bar.value() / 10:.1f}%",
+            "total_progress": (
+                f"{self.total_progress_bar.value() / 10:.1f}%"
+            ),
+            "time": stats.get("out_time", ""),
+            "frame": stats.get("frame", ""),
+            "fps": stats.get("fps", ""),
+            "bitrate": stats.get("bitrate", ""),
+            "size": stats.get("total_size", ""),
+            "speed": stats.get("speed", ""),
+            "ffmpeg_progress": stats.get("progress", ""),
+            "command": script,
+            "shell": shell,
+            "cancelled": "true" if cancelled else "false",
+            "batch": (
+                "true" if self.batch_check.isChecked() else "false"
+            ),
+            "batch_count": str(self.batch_list.rowCount()),
+            "batch_completed": str(counts.get("Completed", 0)),
+            "batch_failed": str(counts.get("Failed", 0)),
+            "batch_cancelled": str(counts.get("Cancelled", 0)),
+            "error": self._notify_error_text(worker),
+            "log": "\n".join(log_lines),
+        }
+
+    def _send_run_notification(self, code: int, cancelled: bool) -> None:
+        config = self._notify_config
+        if not config.enabled or not config.url.strip():
+            return
+        self._notify_client.send(
+            config,
+            self._run_notify_context(code, cancelled),
+        )
 
     def _on_worker_finished(self) -> None:
         worker = self._worker
@@ -2584,6 +3453,8 @@ class MainWindow(QMainWindow):
         if self._worker and self._worker.isRunning():
             self._cancel_event.set()
             self._worker.wait(2000)
+        if self._notify_save_timer.isActive():
+            self._save_notify_config()
         if self._persist_on_close:
             self._save_settings(self._settings_path)
         event.accept()
