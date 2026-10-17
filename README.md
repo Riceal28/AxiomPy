@@ -4,10 +4,10 @@ Python / PySide6 rewrite of [Axiom](https://github.com/MattMcManis/Axiom), the W
 FFmpeg GUI.  The original WPF application stays untouched next door and is used as the
 reference implementation.
 
-> Status: **M1 in progress.**  The C# parity harness is working and produces byte-exact
-> golden command lines.  The full control layer (container/media-type/codec/cut/quality
-> resolution) now matches the oracle across a 60-case matrix; the command generator is
-> the next module.  See [docs/STATUS.md](docs/STATUS.md) for details.
+> Status: **M1 command engine green.**  The C# parity harness, the full control layer and
+> the single-file 1-pass/2-pass generator match the oracle byte for byte across a
+> 60-case matrix.  Remaining M1 work: the full filter chain, batch scripts, presets and
+> output-name tokens.  See [docs/STATUS.md](docs/STATUS.md) for details.
 
 ## Layout
 

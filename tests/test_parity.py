@@ -14,7 +14,10 @@ from axiom.core.cli import generate_command, load_cases
 from axiom.core.generate import PENDING_MODULES
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
-CASE_FILES = [Path(__file__).parent.parent / "tools" / "parity_harness" / "smoke_cases.json"]
+CASE_FILES = [
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "smoke_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "control_cases.json",
+]
 
 
 def golden_cases():

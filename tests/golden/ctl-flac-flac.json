@@ -1,5 +1,5 @@
 {
-  "args": "ffmpeg -y -i \"C:\\Input\\song.wav\" -vn -c:a flac -vbr on -b:a 256kk -map 0:a:0? -sn -map_chapters 0 -map_metadata 0 -f flac -threads 0 \"C:\\Input\\song.flac\"",
+  "args": "ffmpeg -y -i \"C:\\Input\\song.wav\" -vn -c:a flac -map 0:a:0? -sn -map_chapters 0 -map_metadata 0 -f flac -threads 0 \"C:\\Input\\song.flac\"",
   "id": "ctl-flac-flac",
   "messages": [],
   "nulls": [
@@ -7,8 +7,8 @@
     "Audio.Audio_VBR_IsChecked",
     "Audio.Audio_Metadata_Language_IsEnabled"
   ],
-  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.wav\" \r\n\r\n-vn \r\n\r\n-c:a flac \r\n-vbr on -b:a 256kk \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f flac \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.flac\"",
-  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.wav\" \r\n\r\n-vn \r\n\r\n-c:a flac \r\n-vbr on -b:a 256kk \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f flac \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.flac\"",
+  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.wav\" \r\n\r\n-vn \r\n\r\n-c:a flac \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f flac \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.flac\"",
+  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.wav\" \r\n\r\n-vn \r\n\r\n-c:a flac \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f flac \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.flac\"",
   "state": {
     "Audio.Audio_BitDepth_IsEnabled": true,
     "Audio.Audio_BitDepth_Items": [

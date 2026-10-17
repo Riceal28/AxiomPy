@@ -276,6 +276,7 @@ namespace Harness
 
         private static void Reset()
         {
+            ResetGeneratorStatics();
             VM.MainView = new Main();
             VM.FormatView = new Format();
             VM.VideoView = new Video();
@@ -319,6 +320,58 @@ namespace Harness
             Controls.ScriptView.sort = false;
             Controls.Video.Controls.passUserSelected = false;
             Controls.Configure.threads = string.Empty;
+        }
+
+        /// <summary>
+        /// Clear the generator/filter accumulators the WPF app normally keeps for the
+        /// lifetime of a conversion.  Without this, one case's -vf/-af list leaks into
+        /// the next case in the same harness process.
+        /// </summary>
+        private static void ResetGeneratorStatics()
+        {
+            Type[] types =
+            {
+                typeof(Generate.FFmpeg),
+                typeof(Generate.Format),
+                typeof(Generate.Streams),
+                typeof(Generate.Video.Codec),
+                typeof(Generate.Video.Encoding),
+                typeof(Generate.Video.Video),
+                typeof(Generate.Video.Size),
+                typeof(Generate.Video.Color),
+                typeof(Generate.Video.Params),
+                typeof(Generate.Video.Quality),
+                typeof(Generate.Audio.Codec),
+                typeof(Generate.Audio.Quality),
+                typeof(Generate.Audio.Channels),
+                typeof(Generate.Audio.Audio),
+                typeof(Generate.Audio.Metadata),
+                typeof(Generate.Subtitle.Subtitle),
+                typeof(Generate.Subtitle.Metadata),
+                typeof(Filters.Video),
+                typeof(Filters.Audio),
+            };
+
+            foreach (Type type in types)
+            {
+                foreach (FieldInfo field in type.GetFields(
+                             BindingFlags.Public | BindingFlags.Static))
+                {
+                    if (field.FieldType == typeof(string))
+                        field.SetValue(null, null);
+                    else if (field.FieldType == typeof(List<string>))
+                        field.SetValue(null, new List<string>());
+                }
+                foreach (PropertyInfo property in type.GetProperties(
+                             BindingFlags.Public | BindingFlags.Static))
+                {
+                    if (!property.CanWrite) continue;
+                    if (property.PropertyType == typeof(string))
+                        property.SetValue(null, null, null);
+                    else if (property.PropertyType == typeof(List<string>))
+                        property.SetValue(null, new List<string>(), null);
+                }
+            }
         }
 
         private static IEnumerable<KeyValuePair<string, object>> Section(

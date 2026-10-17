@@ -204,6 +204,7 @@ def resolve(state: AxiomState) -> AxiomState:
     subtitle_codec = state.get("Subtitle.Subtitle_Codec_SelectedItem")
     if subtitle_codec:
         subtitle_codec_controls(state, str(subtitle_codec))
+    state.flags["controlsResolved"] = True
     return state
 
 

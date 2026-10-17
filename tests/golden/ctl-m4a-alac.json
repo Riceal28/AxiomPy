@@ -1,5 +1,5 @@
 {
-  "args": "ffmpeg -y -i \"C:\\Input\\song.flac\" -vn -c:a alac -b:a 384kk -map 0:a:0? -sn -map_chapters 0 -map_metadata 0 -threads 0 \"C:\\Input\\song.m4a\"",
+  "args": "ffmpeg -y -i \"C:\\Input\\song.flac\" -vn -c:a alac -map 0:a:0? -sn -map_chapters 0 -map_metadata 0 -threads 0 \"C:\\Input\\song.m4a\"",
   "id": "ctl-m4a-alac",
   "messages": [],
   "nulls": [
@@ -7,8 +7,8 @@
     "Audio.Audio_VBR_IsChecked",
     "Audio.Audio_Metadata_Language_IsEnabled"
   ],
-  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a alac \r\n-b:a 384kk \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.m4a\"",
-  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a alac \r\n-b:a 384kk \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.m4a\"",
+  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a alac \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.m4a\"",
+  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a alac \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.m4a\"",
   "state": {
     "Audio.Audio_BitDepth_IsEnabled": false,
     "Audio.Audio_BitDepth_Items": [

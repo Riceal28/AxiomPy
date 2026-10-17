@@ -26,25 +26,23 @@ from ..assembly import join_fragments
 from ..state import AxiomState
 
 PENDING_MODULES = (
-    "format/cut/chapters",
-    "video codec + encoding + quality + size + colour",
-    "audio codec + quality + channels + metadata",
-    "subtitles",
-    "stream maps",
-    "video/audio filters",
+    "batch scripts",
+    "full video/audio filter chain",
+    "preset tables and output-name tokens",
 )
 
 
 def generate(state: AxiomState) -> str:
     """Return the full command line Axiom would build for ``state``.
 
-    Not implemented yet: the modules listed in :data:`PENDING_MODULES` are being ported
-    one by one and validated against ``tests/golden`` (produced by the C# parity
-    harness).  The signature is already final so callers and tests can be written now.
+    The control layer is resolved first when the caller has not already done it, then
+    the single-file pipeline assembles the FFmpeg fragments.
     """
-    raise NotImplementedError(
-        "generate() is being ported; pending: " + ", ".join(PENDING_MODULES)
-    )
+    from .pipeline import generate as generate_single
+
+    if not state.flags.get("controlsResolved"):
+        resolve_controls(state)
+    return generate_single(state)
 
 
 def resolve_controls(state: AxiomState) -> AxiomState:

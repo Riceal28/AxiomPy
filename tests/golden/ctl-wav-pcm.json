@@ -1,5 +1,5 @@
 {
-  "args": "ffmpeg -y -i \"C:\\Input\\song.flac\" -vn -c:a pcm_s24le -vbr on -b:a 256kkk -map 0:a:0? -sn -map_chapters 0 -map_metadata 0 -f wav -threads 0 \"C:\\Input\\song.wav\"",
+  "args": "ffmpeg -y -i \"C:\\Input\\song.flac\" -vn -c:a pcm_s24le -map 0:a:0? -sn -map_chapters 0 -map_metadata 0 -f wav -threads 0 \"C:\\Input\\song.wav\"",
   "id": "ctl-wav-pcm",
   "messages": [],
   "nulls": [
@@ -7,8 +7,8 @@
     "Audio.Audio_VBR_IsChecked",
     "Audio.Audio_Metadata_Language_IsEnabled"
   ],
-  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a pcm_s24le \r\n-vbr on -b:a 256kkk \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f wav \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.wav\"",
-  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a pcm_s24le \r\n-vbr on -b:a 256kkk \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f wav \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.wav\"",
+  "script": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a pcm_s24le \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f wav \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.wav\"",
+  "sorted": "ffmpeg \r\n\r\n-y \r\n\r\n-i \"C:\\Input\\song.flac\" \r\n\r\n-vn \r\n\r\n-c:a pcm_s24le \r\n-map 0:a:0? \r\n\r\n-sn \r\n\r\n-map_chapters 0 \r\n\r\n-map_metadata 0 \r\n\r\n-f wav \r\n\r\n-threads 0 \r\n\r\n\"C:\\Input\\song.wav\"",
   "state": {
     "Audio.Audio_BitDepth_IsEnabled": true,
     "Audio.Audio_BitDepth_Items": [
