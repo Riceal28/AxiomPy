@@ -21,6 +21,7 @@ All notable changes to AxiomPy are recorded here. This project follows
 - Packaging and development scripts discover FFmpeg/Python from environment variables
   or `PATH` instead of hard-coded local paths.
 - Project metadata now declares PySide6, package data and GitHub-facing classifiers.
+- README now supports English/Simplified Chinese switching.
 
 ### Fixed
 

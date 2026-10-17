@@ -1,5 +1,7 @@
 # AxiomPy
 
+**English** | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/Riceal28/AxiomPy/actions/workflows/ci.yml/badge.svg)](https://github.com/Riceal28/AxiomPy/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9--3.13-3776AB)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.x-41CD52)](https://doc.qt.io/qtforpython/)
@@ -231,10 +233,3 @@ See [LICENSE](LICENSE).
 
 This project is based on Axiom by Matt McManis and is not affiliated with the original
 author. The original WPF implementation remains a separate reference project.
-
-## 中文简介
-
-AxiomPy 是一个基于 Python 与 PySide6 的 Windows FFmpeg 桌面前端，源自 Matt McManis
-的 Axiom。它保留了常用的视频/音频/字幕/滤镜与批处理工作流，并加入硬件编码、
-1280×720 默认布局、界面字体缩放和可关闭的工作区状态恢复。项目采用 GPL-3.0-or-later
-许可证，构建、测试与贡献方式见上方英文文档。
