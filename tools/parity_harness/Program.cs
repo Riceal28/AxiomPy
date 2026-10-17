@@ -79,6 +79,29 @@ namespace Harness
                 foreach (var pair in Section(item, "state")) SetState(pair.Key, pair.Value);
                 foreach (var pair in Section(item, "ffprobe")) SetStatic(typeof(Analyze.FFprobe), pair.Key, pair.Value);
                 foreach (var pair in Section(item, "controls")) SetStatic(typeof(Controls.Configure), pair.Key, pair.Value);
+                MainWindow.BatchExtCheck();
+                if (VM.MainView.Batch_IsChecked)
+                {
+                    string batchExt = VM.MainView.BatchExtension_Text ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(batchExt) || batchExt == "extension")
+                    {
+                        MainWindow.inputExt = string.Empty;
+                    }
+                    else
+                    {
+                        MainWindow.inputExt = batchExt.StartsWith(".")
+                            ? batchExt
+                            : "." + batchExt;
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(VM.MainView.Input_Text))
+                {
+                    // The input-path UI seeds this before OutputPath runs.  With an
+                    // explicit output directory, OutputPath_SingleFile relies on it
+                    // when appending filename tokens.
+                    MainWindow.outputFileName_Original =
+                        Path.GetFileNameWithoutExtension(VM.MainView.Input_Text);
+                }
 
                 result["nulls"] = NullMembers();
 
@@ -87,10 +110,27 @@ namespace Harness
                     VM.MainView.Preset_SelectedItem = Convert.ToString(item["preset"]);
                     Profiles.Presets.SetPreset();
                     result["preset"] = VM.MainView.Preset_SelectedItem;
+                    result["presetState"] = DumpState();
                 }
 
                 ResolveControls();
-
+                foreach (var pair in Section(item, "afterControls")) SetState(pair.Key, pair.Value);
+                foreach (object path in Items(item, "audio_paths"))
+                {
+                    string value = Convert.ToString(path);
+                    Generate.Audio.Audio.audioFilePathsList.Add(
+                        MainWindow.WrapWithQuotes(value));
+                    Generate.Audio.Audio.audioFileNamesList.Add(
+                        Path.GetFileName(value));
+                }
+                foreach (object path in Items(item, "subtitles"))
+                {
+                    string value = Convert.ToString(path);
+                    Generate.Subtitle.Subtitle.subtitleFilePathsList.Add(
+                        MainWindow.WrapWithQuotes(value));
+                    Generate.Subtitle.Subtitle.subtitleFileNamesList.Add(
+                        Path.GetFileName(value));
+                }
                 result["state"] = DumpState();
 
                 if (VM.MainView.Batch_IsChecked == true)
@@ -122,7 +162,7 @@ namespace Harness
             }
             catch (Exception ex)
             {
-                result["error"] = ex.ToString();
+                result["error"] = ex.GetType().FullName + ": " + ex.Message;
             }
 
             return result;
@@ -316,6 +356,8 @@ namespace Harness
             MainWindow.Audio_SampleRate_PreviousItem = null;
             MainWindow.Audio_BitDepth_PreviousItem = null;
             MainWindow.Audio_VBR_PreviousChecked = null;
+            CropWindow.crop = string.Empty;
+            CropWindow.Divisible = false;
             Dialog.Messages = new List<string>();
             Controls.ScriptView.sort = false;
             Controls.Video.Controls.passUserSelected = false;
@@ -381,6 +423,14 @@ namespace Harness
             var section = item[key] as Dictionary<string, object>;
             if (section == null) yield break;
             foreach (var pair in section) yield return pair;
+        }
+
+        private static IEnumerable<object> Items(Dictionary<string, object> item, string key)
+        {
+            if (!item.ContainsKey(key) || item[key] == null) yield break;
+            var list = item[key] as IEnumerable;
+            if (list == null || item[key] is string) yield break;
+            foreach (object value in list) yield return value;
         }
 
         private static void SetState(string dotted, object value)

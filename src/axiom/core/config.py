@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterator
 
+from .presets_data import BUILTIN_PRESETS, PRESET_VARIANTS
+
 SCHEMA_VERSION = 1
 APP_DIR_NAME = "AxiomPy"
 SETTINGS_FILE_NAME = "axiom.json"
@@ -21,8 +23,13 @@ PRESET_SUFFIX = ".json"
 
 def default_config_dir(portable_root: Path | None = None) -> Path:
     """Portable ``config/`` wins over ``%APPDATA%\\AxiomPy\\`` (as the original did)."""
-    if portable_root is not None:
-        portable = Path(portable_root) / "config"
+    root = portable_root
+    if root is None:
+        override = os.environ.get("AXIOM_PORTABLE_ROOT")
+        if override:
+            root = Path(override)
+    if root is not None:
+        portable = Path(root) / "config"
         if portable.is_dir():
             return portable
     return Path(os.environ.get("APPDATA", Path.home())) / APP_DIR_NAME
@@ -87,10 +94,18 @@ class PresetStore:
 
     def __init__(self, directory: Path | None = None, builtin: Dict[str, Dict[str, Any]] | None = None):
         self.directory = Path(directory) if directory is not None else default_config_dir() / "presets"
-        self.builtin: Dict[str, Dict[str, Any]] = dict(builtin or {})
+        self.builtin: Dict[str, Dict[str, Any]] = dict(
+            BUILTIN_PRESETS if builtin is None else builtin
+        )
+        self.variants: Dict[str, Dict[str, Dict[str, Any]]] = (
+            PRESET_VARIANTS if builtin is None else {}
+        )
 
     def names(self) -> list[str]:
-        return list(self.builtin) + [preset.name for preset in self.user_presets()]
+        defaults = ["Preset"] if self.variants else []
+        return defaults + list(self.builtin) + [
+            preset.name for preset in self.user_presets()
+        ]
 
     def user_presets(self) -> Iterator[Preset]:
         if not self.directory.is_dir():
@@ -101,13 +116,29 @@ class PresetStore:
             except (ValueError, KeyError, json.JSONDecodeError):
                 continue
 
-    def load(self, name: str) -> Dict[str, Any]:
+    def load(self, name: str, state: Any = None) -> Dict[str, Any]:
+        if name in self.variants:
+            container = (
+                state.get("Format.Format_Container_SelectedItem")
+                if state is not None
+                else None
+            )
+            variant = (
+                "audio"
+                if container in {"m4a", "mp3", "ogg", "flac", "wav"}
+                else "video"
+            )
+            return dict(self.variants[name].get(variant, {}))
         if name in self.builtin:
             return dict(self.builtin[name])
         for preset in self.user_presets():
             if preset.name == name:
                 return dict(preset.state)
         raise KeyError(f"unknown preset: {name}")
+
+    def apply(self, name: str, state: Any) -> Any:
+        state.update(self.load(name, state))
+        return state
 
     def save(self, name: str, state: Dict[str, Any]) -> Path:
         self.directory.mkdir(parents=True, exist_ok=True)

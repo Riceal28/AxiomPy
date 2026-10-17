@@ -24,12 +24,9 @@ from __future__ import annotations
 
 from ..assembly import join_fragments
 from ..state import AxiomState
+from ..script import Script, generate_script, to_argv
 
-PENDING_MODULES = (
-    "batch scripts",
-    "full video/audio filter chain",
-    "preset tables and output-name tokens",
-)
+PENDING_MODULES: tuple[str, ...] = ()
 
 
 def generate(state: AxiomState) -> str:
@@ -38,10 +35,13 @@ def generate(state: AxiomState) -> str:
     The control layer is resolved first when the caller has not already done it, then
     the single-file pipeline assembles the FFmpeg fragments.
     """
+    from . import batch
     from .pipeline import generate as generate_single
 
     if not state.flags.get("controlsResolved"):
         resolve_controls(state)
+    if state.get("Main.Batch_IsChecked"):
+        return batch.generate(state)
     return generate_single(state)
 
 
@@ -52,5 +52,21 @@ def resolve_controls(state: AxiomState) -> AxiomState:
     return resolve(state)
 
 
-__all__ = ["generate", "resolve_controls", "join_fragments"]
+def generate_args(state: AxiomState) -> list[str]:
+    """Return the generated single-file command split into argument tokens.
+
+    ``generate`` remains the byte-for-byte parity surface.  New callers that want
+    argv-style access can use this helper without affecting the C# golden corpus.
+    """
+    return to_argv(generate(state))
+
+
+__all__ = [
+    "generate",
+    "generate_args",
+    "generate_script",
+    "Script",
+    "resolve_controls",
+    "join_fragments",
+]
 

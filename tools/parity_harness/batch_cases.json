@@ -1,0 +1,130 @@
+[
+  {
+    "id": "bat-cmd-mkv-x264-2pass",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\",
+      "Main.Batch_IsChecked": true,
+      "Main.BatchExtension_Text": "mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30",
+      "vEntryTypeBatch": "format^=bit_rate",
+      "aEntryType": "stream^=bit_rate"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "bat-cmd-mp4-crf",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\",
+      "Main.Batch_IsChecked": true,
+      "Main.BatchExtension_Text": ".mov",
+      "Main.Output_Text": "C:\\Output\\",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "CRF",
+      "Video.Video_CRF_Text": "22",
+      "Video.Video_BitRate_Text": "4000"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30",
+      "vEntryTypeBatch": "stream^=bit_rate",
+      "aEntryType": "stream^=bit_rate"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "bat-cmd-mkv-1pass",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\",
+      "Main.Batch_IsChecked": true,
+      "Main.BatchExtension_Text": "mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "1 Pass",
+      "Video.Video_BitRate_Text": "4000"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30",
+      "vEntryTypeBatch": "format^=bit_rate",
+      "aEntryType": "stream^=bit_rate"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "bat-ps-mkv-x264-2pass",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\",
+      "Main.Batch_IsChecked": true,
+      "Main.BatchExtension_Text": "mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "PowerShell"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30",
+      "vEntryTypeBatch": "format=bit_rate",
+      "aEntryType": "stream=bit_rate"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "bat-ps-mp4-audio-auto",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\",
+      "Main.Batch_IsChecked": true,
+      "Main.BatchExtension_Text": ".mov",
+      "Main.Output_Text": "C:\\Output\\",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "PowerShell"
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "1 Pass",
+      "Video.Video_BitRate_Text": "4000"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30",
+      "vEntryTypeBatch": "stream=bit_rate",
+      "aEntryType": "stream=bit_rate"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  }
+]

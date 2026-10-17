@@ -1,0 +1,81 @@
+[
+  {
+    "id": "ext-subtitle-mux",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Subtitle.Subtitle_Codec_SelectedItem": "SRT",
+      "Subtitle.Subtitle_Stream_SelectedItem": "mux"
+    },
+    "afterControls": {
+      "Subtitle.Subtitle_Stream_SelectedItem": "mux"
+    },
+    "subtitles": [
+      "C:\\Subs\\English.srt",
+      "C:\\Subs\\Extra Track.ass"
+    ],
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ext-subtitle-burn",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mov",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "afterFormat": {
+      "Subtitle.Subtitle_Codec_SelectedItem": "Burn",
+      "Subtitle.Subtitle_Stream_SelectedItem": "mux"
+    },
+    "afterControls": {
+      "Subtitle.Subtitle_Stream_SelectedItem": "mux"
+    },
+    "subtitles": ["C:\\Subs\\English.srt"],
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "ext-audio-mux",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Audio.Audio_Codec_SelectedItem": "AC3",
+      "Audio.Audio_Stream_SelectedItem": "mux"
+    },
+    "audio_paths": [
+      "C:\\Audio\\Commentary.ac3",
+      "C:\\Audio\\Music.flac"
+    ],
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  }
+]

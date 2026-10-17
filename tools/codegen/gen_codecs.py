@@ -115,6 +115,15 @@ def parse_value(raw: str):
     literal = re.fullmatch(r'@?"(.*)"', value, re.DOTALL)
     if literal:
         return literal.group(1).replace('\\"', '"').replace("\\\\", "\\")
+    wrapped = re.fullmatch(
+        r'"(?P<prefix>.*)"\s*\+\s*MainWindow\.WrapWithQuotes\("(?P<inner>.*)"\)',
+        value,
+        re.DOTALL,
+    )
+    if wrapped:
+        prefix = wrapped.group("prefix").replace('\\"', '"').replace("\\\\", "\\")
+        inner = wrapped.group("inner").replace('\\"', '"').replace("\\\\", "\\")
+        return prefix + '"' + inner + '"'
     number = re.fullmatch(r"-?\d+(\.\d+)?", value)
     if number:
         return float(value) if "." in value else int(value)

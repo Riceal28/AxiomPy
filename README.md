@@ -4,10 +4,13 @@ Python / PySide6 rewrite of [Axiom](https://github.com/MattMcManis/Axiom), the W
 FFmpeg GUI.  The original WPF application stays untouched next door and is used as the
 reference implementation.
 
-> Status: **M1 command engine green.**  The C# parity harness, the full control layer and
-> the single-file 1-pass/2-pass generator match the oracle byte for byte across a
-> 60-case matrix.  Remaining M1 work: the full filter chain, batch scripts, presets and
-> output-name tokens.  See [docs/STATUS.md](docs/STATUS.md) for details.
+> Status: **M1 parity, the M2 desktop workflow and the M3 portable build are all
+> runnable.**  The C# oracle drives 129 golden commands; the Python suite currently
+> reports `311 passed` plus an opt-in real FFmpeg conversion.  The PySide6 app has
+> the six original tabs, sub-tabs, all retained `IsEnabled` bindings, batch queue,
+> external audio/subtitle files, editable/sorted scripts, built-in progress/cancel,
+> settings and presets.  A PyInstaller onedir package is produced under `dist\AxiomPy`.
+> See [docs/STATUS.md](docs/STATUS.md) for the narrow remaining polish list.
 
 ## Layout
 
@@ -16,8 +19,38 @@ reference implementation.
 | `src/axiom/core` | Pure logic: state model, argument generation, presets, config, probing, running. No Qt imports. |
 | `src/axiom/platform` | Platform abstraction (paths, shells, process/window behaviour). Windows first, POSIX hooks reserved. |
 | `src/axiom/ui` | PySide6 desktop UI (single Axiom Dark skin). |
+| `packaging` | PyInstaller spec plus build and startup-verification scripts. |
 | `tools/parity_harness` | C# console app that links the *original* generator sources and dumps golden commands. |
 | `tests/golden` | Golden command lines produced by the harness. |
+
+## Run
+
+From source:
+
+```powershell
+$env:PYTHONPATH="G:\Codex_workspace\AxiomPy\src"
+D:\python\python.exe -m axiom.ui.app
+```
+
+Portable build (no Python installation required on the target machine):
+
+```powershell
+.\dist\AxiomPy\AxiomPy.exe
+```
+
+The portable folder contains `ffmpeg.exe`, `ffprobe.exe` and `ffplay.exe` under
+`_internal`.  If a `config\` directory exists beside `AxiomPy.exe`, settings and
+presets are stored there; otherwise they use `%APPDATA%\AxiomPy\`.
+
+## Build a portable package
+
+```powershell
+.\packaging\build.ps1
+.\packaging\verify.ps1
+```
+
+`build.ps1` accepts `-FfmpegBin` and `-Python`.  The default FFmpeg source is
+`F:\ffmpeg-8.0.1\bin`; the generated folder is `dist\AxiomPy`.
 
 ## Parity harness
 
@@ -28,7 +61,14 @@ UI dialogs.  The original repository is never modified.
 
 ```powershell
 python tools/parity_harness/build_harness.py          # build the oracle
-python tools/parity_harness/run_goldens.py            # cases -> tests/golden/*.json
+python tools/parity_harness/run_goldens.py --cases `
+  tools/parity_harness/smoke_cases.json `
+  tools/parity_harness/control_cases.json `
+  tools/parity_harness/filter_cases.json `
+  tools/parity_harness/batch_cases.json `
+  tools/parity_harness/preset_cases.json `
+  tools/parity_harness/output_cases.json `
+  tools/parity_harness/external_cases.json            # all goldens
 pytest -q                                             # unit tests + golden comparison
 ```
 
@@ -36,10 +76,18 @@ pytest -q                                             # unit tests + golden comp
 
 ```powershell
 python -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
+python -m axiom.ui.app
 ```
 
 The CLI accepts the same case format as the harness, which keeps the parity tests
 symmetric: one JSON case in, one command line out, compared byte for byte.
+
+The real-conversion test is opt-in because it requires ffmpeg:
+
+```powershell
+$env:AXIOM_RUN_E2E="1"
+pytest tests/test_e2e_ffmpeg.py -q
+```
 
 ## Licence
 

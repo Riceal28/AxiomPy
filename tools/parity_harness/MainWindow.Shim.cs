@@ -650,6 +650,29 @@ namespace Axiom
                     return input;
                 }
 
+        // >>> member: BatchExtCheck
+                public static void BatchExtCheck()
+                {
+                    if (VM.MainView.Batch_IsChecked == true)
+                    {
+                        // Add period to Batch Extension if User did not enter one
+                        if (!string.IsNullOrWhiteSpace(VM.MainView.BatchExtension_Text))
+                        {
+                            if (VM.MainView.BatchExtension_Text != "extension" &&
+                                VM.MainView.BatchExtension_Text != "." &&
+                                !VM.MainView.BatchExtension_Text.StartsWith(".")
+                                )
+                            {
+                                inputExt = "." + VM.MainView.BatchExtension_Text;
+                            }
+                        }
+                        else
+                        {
+                            inputExt = string.Empty;
+                        }
+                    }
+                }
+
         // >>> member: BatchInputDirectory
                 public static String BatchInputDirectory()
                 {

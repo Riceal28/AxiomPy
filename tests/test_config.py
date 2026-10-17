@@ -1,6 +1,11 @@
 """Settings and preset storage (new JSON format, no legacy INI)."""
 
-from axiom.core.config import Preset, PresetStore, Settings
+from axiom.core.config import (
+    Preset,
+    PresetStore,
+    Settings,
+    default_config_dir,
+)
 
 
 def test_settings_round_trip(tmp_path):
@@ -36,4 +41,11 @@ def test_preset_payload_shape():
     payload = Preset("X", {"a": 1}).to_dict()
     assert payload["schema"] == 1 and payload["name"] == "X"
     assert Preset.from_dict(payload).state == {"a": 1}
+
+
+def test_portable_config_environment_override(tmp_path, monkeypatch):
+    portable = tmp_path / "config"
+    portable.mkdir()
+    monkeypatch.setenv("AXIOM_PORTABLE_ROOT", str(tmp_path))
+    assert default_config_dir() == portable
 

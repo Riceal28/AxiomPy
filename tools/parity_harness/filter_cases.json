@@ -1,0 +1,275 @@
+[
+  {
+    "id": "flt-video-fix",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "FilterVideo.FilterVideo_DropFrames_SelectedItem": "enabled",
+      "FilterVideo.FilterVideo_Deinterlace_SelectedItem": "frame",
+      "FilterVideo.FilterVideo_Deblock_SelectedItem": "strong+",
+      "FilterVideo.FilterVideo_Deflicker_SelectedItem": "enabled",
+      "FilterVideo.FilterVideo_Denoise_SelectedItem": "nlmeans medium",
+      "FilterVideo.FilterVideo_Deband_SelectedItem": "enabled",
+      "FilterVideo.FilterVideo_Deshake_SelectedItem": "enabled",
+      "FilterVideo.FilterVideo_Dejudder_SelectedItem": "enabled"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-transpose-eq",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "FilterVideo.FilterVideo_Flip_SelectedItem": "both",
+      "FilterVideo.FilterVideo_Rotate_SelectedItem": "180° CW",
+      "FilterVideo.FilterVideo_EQ_Brightness_Value": 25,
+      "FilterVideo.FilterVideo_EQ_Contrast_Value": -20,
+      "FilterVideo.FilterVideo_EQ_Saturation_Value": 30,
+      "FilterVideo.FilterVideo_EQ_Gamma_Value": -15
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-selective",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "FilterVideo.FilterVideo_SelectiveColor_Correction_Method_SelectedItem": "absolute",
+      "FilterVideo.FilterVideo_SelectiveColor_Reds_Cyan_Value": 20,
+      "FilterVideo.FilterVideo_SelectiveColor_Reds_Magenta_Value": -10,
+      "FilterVideo.FilterVideo_SelectiveColor_Reds_Yellow_Value": 5,
+      "FilterVideo.FilterVideo_SelectiveColor_Yellows_Cyan_Value": -20,
+      "FilterVideo.FilterVideo_SelectiveColor_Yellows_Magenta_Value": 10,
+      "FilterVideo.FilterVideo_SelectiveColor_Yellows_Yellow_Value": 0,
+      "FilterVideo.FilterVideo_SelectiveColor_Greens_Cyan_Value": 7,
+      "FilterVideo.FilterVideo_SelectiveColor_Greens_Magenta_Value": 8,
+      "FilterVideo.FilterVideo_SelectiveColor_Greens_Yellow_Value": 9,
+      "FilterVideo.FilterVideo_SelectiveColor_Cyans_Cyan_Value": -7,
+      "FilterVideo.FilterVideo_SelectiveColor_Cyans_Magenta_Value": -8,
+      "FilterVideo.FilterVideo_SelectiveColor_Cyans_Yellow_Value": -9,
+      "FilterVideo.FilterVideo_SelectiveColor_Blues_Cyan_Value": 12,
+      "FilterVideo.FilterVideo_SelectiveColor_Blues_Magenta_Value": -12,
+      "FilterVideo.FilterVideo_SelectiveColor_Blues_Yellow_Value": 3,
+      "FilterVideo.FilterVideo_SelectiveColor_Magentas_Cyan_Value": 4,
+      "FilterVideo.FilterVideo_SelectiveColor_Magentas_Magenta_Value": 5,
+      "FilterVideo.FilterVideo_SelectiveColor_Magentas_Yellow_Value": 6,
+      "FilterVideo.FilterVideo_SelectiveColor_Whites_Cyan_Value": -4,
+      "FilterVideo.FilterVideo_SelectiveColor_Whites_Magenta_Value": -5,
+      "FilterVideo.FilterVideo_SelectiveColor_Whites_Yellow_Value": -6,
+      "FilterVideo.FilterVideo_SelectiveColor_Neutrals_Cyan_Value": 2,
+      "FilterVideo.FilterVideo_SelectiveColor_Neutrals_Magenta_Value": 1,
+      "FilterVideo.FilterVideo_SelectiveColor_Neutrals_Yellow_Value": -1,
+      "FilterVideo.FilterVideo_SelectiveColor_Blacks_Cyan_Value": -2,
+      "FilterVideo.FilterVideo_SelectiveColor_Blacks_Magenta_Value": -3,
+      "FilterVideo.FilterVideo_SelectiveColor_Blacks_Yellow_Value": 11
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-audio-volume",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "m4a",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Audio.Audio_Volume_Text": "85"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "",
+      "inputAudioBitRate": "192000",
+      "inputSize": "",
+      "inputDuration": "60.0",
+      "inputFrameRate": ""
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-audio-chain",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Audio.Audio_Volume_Text": "85%",
+      "Audio.Audio_HardLimiter_Value": -6,
+      "FilterAudio.FilterAudio_Lowpass_SelectedItem": "enabled",
+      "FilterAudio.FilterAudio_Highpass_SelectedItem": "enabled",
+      "FilterAudio.FilterAudio_Contrast_Value": 20,
+      "FilterAudio.FilterAudio_ExtraStereo_Value": 50,
+      "FilterAudio.FilterAudio_Headphones_SelectedItem": "enabled",
+      "FilterAudio.FilterAudio_Tempo_Value": 120
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-audio-combo",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mov",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD",
+      "FilterVideo.FilterVideo_Flip_SelectedItem": "horizontal",
+      "FilterVideo.FilterVideo_Deband_SelectedItem": "enabled",
+      "FilterVideo.FilterVideo_EQ_Brightness_Value": 10,
+      "Audio.Audio_Volume_Text": "75",
+      "Audio.Audio_HardLimiter_Value": -12,
+      "FilterAudio.FilterAudio_Tempo_Value": 90
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-2pass",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Video.Video_Pass_SelectedItem": "2 Pass",
+      "FilterVideo.FilterVideo_Deinterlace_SelectedItem": "field nospatial",
+      "FilterVideo.FilterVideo_EQ_Contrast_Value": 40
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-scale-preset",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Video.Video_Scale_SelectedItem": "1080p",
+      "Video.Video_Width_Text": "1920",
+      "Video.Video_Height_Text": "1080",
+      "Video.Video_ScreenFormat_SelectedItem": "Widescreen",
+      "Video.Video_ScalingAlgorithm_SelectedItem": "lanczos"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-scale-custom-odd",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Video.Video_Scale_SelectedItem": "Custom",
+      "Video.Video_Width_Text": "777",
+      "Video.Video_Height_Text": "777",
+      "Video.Video_ScalingAlgorithm_SelectedItem": "auto",
+      "Video.Video_CropClear_Text": "Clear"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-scale-auto",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Video.Video_Scale_SelectedItem": "Custom",
+      "Video.Video_Width_Text": "auto",
+      "Video.Video_Height_Text": "auto"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "flt-video-speed",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\clip.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Video.Video_Speed_SelectedItem": "50%",
+      "Video.Video_Speed_Text": "50%"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1280x720",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  }
+]

@@ -100,7 +100,7 @@ class AxiomState:
 
     def update(self, overrides: Mapping[str, Any]) -> None:
         for key, value in overrides.items():
-            self.values[key] = value
+            self.set(key, value)
 
     def pop(self, key: str) -> Any:
         return self.values.pop(key)
@@ -144,15 +144,28 @@ class AxiomState:
     def from_case(cls, case: Mapping[str, Any]) -> "AxiomState":
         """Build a state from a parity-harness case (``state`` section + preset)."""
         state = cls(dict(case.get("state") or {}))
+        preset = case.get("preset")
+        if preset:
+            from .config import PresetStore
+
+            PresetStore().apply(str(preset), state)
+            state.set("Main.Preset_SelectedItem", str(preset))
         probe = case.get("ffprobe") or {}
         if probe:
             state.set("_ffprobe", dict(probe))
         controls = case.get("controls") or {}
         if controls:
             state.set("_controls", dict(controls))
+        if case.get("audio_paths"):
+            state.set("_audio_paths", list(case["audio_paths"]))
+        if case.get("subtitles"):
+            state.set("_subtitle_paths", list(case["subtitles"]))
         after_format = case.get("afterFormat") or {}
         if after_format:
             state.set("_after_format", dict(after_format))
+        after_controls = case.get("afterControls") or {}
+        if after_controls:
+            state.set("_after_controls", dict(after_controls))
         return state
 
     @property

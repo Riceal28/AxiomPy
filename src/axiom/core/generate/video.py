@@ -7,6 +7,7 @@ from typing import Any, Dict, Mapping
 
 from .. import codecs
 from ..state import AxiomState
+from . import filters_video
 from .context import BuildContext
 
 
@@ -21,6 +22,18 @@ SCALE_FIX_CODECS = {
     "HEVC QSV",
     "MPEG-2",
     "MPEG-4",
+}
+
+SIZE_AUTO_CODECS = {
+    "VP8",
+    "VP9",
+    "AV1",
+    "FFV1",
+    "HuffYUV",
+    "Theora",
+    "JPEG",
+    "PNG",
+    "WebP",
 }
 
 
@@ -226,21 +239,89 @@ def _scaling_algorithm(state: AxiomState) -> str:
     return "" if selected == "auto" else ":flags=" + str(selected)
 
 
+def _size_auto(codec: str) -> str:
+    if codec in SIZE_AUTO_CODECS:
+        return "-1"
+    if codec in SCALE_FIX_CODECS:
+        return "-2"
+    return "-1"
+
+
 def add_scale_filter(ctx: BuildContext) -> None:
     state = ctx.state
     codec = state.get("Video.Video_Codec_SelectedItem")
-    size = state.get("Video.Video_Scale_SelectedItem")
+    codec = str(codec or "")
+    size = str(state.get("Video.Video_Scale_SelectedItem") or "")
+    width_text = str(state.get("Video.Video_Width_Text") or "")
+    height_text = str(state.get("Video.Video_Height_Text") or "")
+    screen = str(state.get("Video.Video_ScreenFormat_SelectedItem") or "auto")
+    crop_clear = str(state.get("Video.Video_CropClear_Text") or "")
+
+    # ``Generate.Video.Size.Scale`` handles four situations.  The Auto branches of
+    # Custom sizing deliberately add no scale filter in the original application.
     if size == "Source":
         if codec in SCALE_FIX_CODECS:
             ctx.v_filters.append(
                 "scale=trunc(iw/2)*2:trunc(ih/2)*2" + _scaling_algorithm(state)
             )
         return
-    width = state.get("Video.Video_Width_Text")
-    height = state.get("Video.Video_Height_Text")
-    if size == "Custom":
+
+    if size != "Custom":
+        if screen in ("auto", "Widescreen", "Ultrawide"):
+            width = width_text
+            height = _size_auto(codec)
+        elif screen == "Full Screen":
+            width = _size_auto(codec)
+            height = height_text
+        else:
+            width = width_text
+            height = _size_auto(codec)
+        ctx.v_filters.append(f"scale={width}:{height}" + _scaling_algorithm(state))
+        return
+
+    width_auto = width_text.lower() == "auto"
+    height_auto = height_text.lower() == "auto"
+
+    if codec in ("VP8", "VP9", "Theora", "JPEG", "PNG", "WebP"):
+        width = "-1" if width_auto else width_text
+        height = "-1" if height_auto else height_text
+        ctx.v_filters.append(f"scale={width}:{height}" + _scaling_algorithm(state))
+        return
+
+    if codec not in SCALE_FIX_CODECS:
+        return
+
+    if width_auto and height_auto:
+        return
+    if width_auto or height_auto:
+        # Preserved from the original: one Auto dimension gets normalized locally but
+        # no scale fragment is emitted.
+        return
+
+    try:
+        width_number = int(width_text)
+    except ValueError:
+        width_number = 0
+    try:
+        height_number = int(height_text)
+    except ValueError:
+        height_number = 0
+
+    scale = f"scale={width_text}:{height_text}" + _scaling_algorithm(state)
+    if crop_clear == "Clear":
+        ctx.v_filters.append(scale)
+    elif crop_clear == "Clear*":
+        manual = str(state.values.get("_crop") or "")
+        if manual:
+            ctx.v_filters.append(manual)
+        ctx.v_filters.append(scale)
+
+    if crop_clear in ("Clear", "Clear*") and (
+        width_number % 2 or height_number % 2
+    ):
         ctx.v_filters.append(
-            f"scale={width}:{height}" + _scaling_algorithm(state)
+            f"crop={width_number - width_number % 2}:"
+            f"{height_number - height_number % 2}:0:0"
         )
 
 
@@ -279,6 +360,7 @@ def video_filter(ctx: BuildContext) -> str:
             "'if(lte(alpha(X,Y),16),128,p(X,Y))':"
             "'if(lte(alpha(X,Y),16),128,p(X,Y))'"
         )
+    filters_video.add_video_filters(ctx)
     filters = [part for part in ctx.v_filters if part]
     if not filters:
         return ""
@@ -311,13 +393,20 @@ def video_quality(ctx: BuildContext, pass_name: str) -> str:
 
     if quality == "Auto" and codec not in ("FFV1", "HuffYUV"):
         row = _row("video", str(codec), "quality", quality)
-        v_bitrate = video_bitrate_calculator(ctx)
-        v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
-        if not ctx.probe_value("inputVideoBitRate").strip() and codec:
-            na = str(row.get("NA") or "")
-            if na:
-                v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
-                v_bitrate = na
+        if ctx.batch:
+            v_bitmode = "-b:v"
+            if state.get("Format.Format_MediaType_SelectedItem") == "Image":
+                v_bitrate = str(row.get("VBR") or "")
+            else:
+                v_bitrate = "%V" if ctx.shell == "CMD" else "$vBitrate"
+        else:
+            v_bitrate = video_bitrate_calculator(ctx)
+            v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
+            if not ctx.probe_value("inputVideoBitRate").strip() and codec:
+                na = str(row.get("NA") or "")
+                if na:
+                    v_bitmode = bit_rate_mode(state, quality, bitrate_text, vbr)
+                    v_bitrate = na
         v_crf = ""
     elif quality == "Lossless":
         if codec == "x265":

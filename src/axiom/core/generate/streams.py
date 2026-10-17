@@ -28,9 +28,9 @@ def format_maps(state: AxiomState, ctx: BuildContext) -> str:
     if audio_stream != "mux" and subtitle_stream not in ("mux", "external"):
         return "-map_metadata 0"
     if audio_stream == "mux" and subtitle_stream != "mux":
-        return "-map_metadata:s:v 0 -map_metadata:s:s 0"
+        return "-map_metadata:s:v 0\r\n-map_metadata:s:s 0"
     if subtitle_stream == "mux" and audio_stream != "mux":
-        return "-map_metadata:s:v 0 -map_metadata:s:a 0"
+        return "-map_metadata:s:v 0\r\n-map_metadata:s:a 0"
     if subtitle_stream == "mux" and audio_stream == "mux":
         return "-map_metadata:s:v 0"
     return ""
@@ -60,7 +60,9 @@ def audio_stream_maps(state: AxiomState, ctx: BuildContext) -> str:
     if stream == "none":
         mapping = "-an"
     elif stream == "mux":
-        mapping = ""
+        mapping = "\r\n".join(
+            f"-map {index + 1}:a?" for index in range(len(ctx.audio_paths))
+        )
     elif stream == "all":
         mapping = {
             "webm": "-map 0:a:0?",
@@ -87,6 +89,15 @@ def audio_stream_maps(state: AxiomState, ctx: BuildContext) -> str:
         mapping = ""
     if state.get("Audio.Audio_Quality_SelectedItem") == "Mute":
         mapping = "-an"
+    if stream == "mux" and mapping:
+        selected = state.get("Audio.Audio_ListView_SelectedItems") or []
+        items = state.get("Audio.Audio_ListView_Items") or []
+        checked = ""
+        for index, item in enumerate(items):
+            if item in selected:
+                checked = str(index)
+        if checked:
+            mapping += " \r\n-disposition:a:" + checked + " default"
     return mapping
 
 
@@ -98,7 +109,16 @@ def subtitle_maps(state: AxiomState, ctx: BuildContext) -> str:
     if stream == "none":
         mapping = "-sn"
     elif stream == "mux":
-        mapping = ""
+        map_start = 0
+        if (
+            state.get("Audio.Audio_Stream_SelectedItem") == "mux"
+            and ctx.audio_paths
+        ):
+            map_start = len(ctx.audio_paths)
+        mapping = "\r\n".join(
+            f"-map {index + 1 + map_start}:s?"
+            for index in range(len(ctx.subtitle_paths))
+        )
     elif stream == "all":
         mapping = {
             "webm": "-sn",
@@ -123,6 +143,15 @@ def subtitle_maps(state: AxiomState, ctx: BuildContext) -> str:
 
     if _is_audio_input(ctx):
         mapping = ""
+    if stream == "mux" and mapping:
+        selected = state.get("Subtitle.Subtitle_ListView_SelectedItems") or []
+        items = state.get("Subtitle.Subtitle_ListView_Items") or []
+        checked = ""
+        for index, item in enumerate(items):
+            if item in selected:
+                checked = str(index)
+        if checked:
+            mapping += " \r\n-disposition:s:" + checked + " default"
     return mapping
 
 

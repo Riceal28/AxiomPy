@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 
 from ..state import AxiomState
 from ..text import wrap_with_quotes
+from . import naming
 
 
 AUDIO_FORMATS = {
@@ -88,6 +89,24 @@ def _ffmpeg_path(state: AxiomState) -> str:
     )
 
 
+def _ffprobe_path(state: AxiomState) -> str:
+    value = state.get("Configure.FFprobePath_Text") or "<auto>"
+    if value == "<auto>":
+        return "ffprobe"
+    return wrap_with_quotes(
+        value,
+        state.get("Configure.Shell_SelectedItem") or "CMD",
+        state.get("Configure.ProcessPriority_SelectedItem") or "Default",
+    )
+
+
+def _batch_extension(state: AxiomState) -> str:
+    value = str(state.get("Main.BatchExtension_Text") or "")
+    if not value.strip() or value == "extension":
+        return ""
+    return value if value.startswith(".") else "." + value
+
+
 @dataclass
 class BuildContext:
     state: AxiomState
@@ -102,9 +121,13 @@ class BuildContext:
     output_path: str
     threads: str
     ffmpeg: str
+    ffprobe: str
+    batch_input_directory: str
     v_filters: List[str] = field(default_factory=list)
     v_params: List[str] = field(default_factory=list)
     v_filter: str = ""
+    subtitle_paths: List[str] = field(default_factory=list)
+    audio_paths: List[str] = field(default_factory=list)
 
     @property
     def shell(self) -> str:
@@ -113,6 +136,10 @@ class BuildContext:
     @property
     def process_priority(self) -> str:
         return self.state.get("Configure.ProcessPriority_SelectedItem") or "Default"
+
+    @property
+    def batch(self) -> bool:
+        return bool(self.state.get("Main.Batch_IsChecked"))
 
     def quote(self, value: str) -> str:
         return wrap_with_quotes(value, self.shell, self.process_priority)
@@ -126,8 +153,9 @@ def build_context(state: AxiomState) -> BuildContext:
     input_text = str(state.get("Main.Input_Text") or "")
     batch = bool(state.get("Main.Batch_IsChecked"))
     if batch:
-        input_dir = input_text.rstrip("\\") + "\\"
-        input_ext = ntpath.splitext(state.get("Main.BatchExtension_Text") or "")[1]
+        batch_input_directory = input_text
+        input_dir = input_text.rstrip("\\") + "\\" if input_text else ""
+        input_ext = _batch_extension(state)
         input_filename = (
             "%f"
             if (state.get("Configure.Shell_SelectedItem") or "CMD") == "CMD"
@@ -135,6 +163,7 @@ def build_context(state: AxiomState) -> BuildContext:
         )
         input_path = input_dir + input_filename
     else:
+        batch_input_directory = ""
         input_dir = _windows_dir(input_text) if input_text else ""
         input_filename = ntpath.splitext(ntpath.basename(input_text))[0]
         input_ext = ntpath.splitext(input_text)[1]
@@ -142,14 +171,60 @@ def build_context(state: AxiomState) -> BuildContext:
 
     output_text = str(state.get("Main.Output_Text") or "")
     output_ext = "." + str(state.get("Format.Format_Container_SelectedItem") or "")
-    if output_text:
+    if batch:
+        output_dir = _windows_dir(output_text) if output_text else input_dir
+        output_filename = (
+            "%~nf"
+            if (state.get("Configure.Shell_SelectedItem") or "CMD") == "CMD"
+            else "$outputName"
+        )
+    elif output_text:
         output_dir = _windows_dir(output_text)
-        output_filename = ntpath.splitext(ntpath.basename(output_text))[0]
+        base_name = naming.token_remover(state, input_filename)
+        output_filename = naming.file_renamer(
+            state,
+            input_dir,
+            output_dir,
+            input_filename,
+            input_ext,
+            base_name,
+            output_ext,
+        )
+        if naming.selected_tokens(state):
+            output_filename = naming.file_renamer(
+                state,
+                input_dir,
+                output_dir,
+                input_filename,
+                input_ext,
+                naming.token_appender(state, input_text, base_name),
+                output_ext,
+            )
     else:
         output_dir = input_dir
-        output_filename = input_filename
+        base_name = naming.token_remover(state, input_filename)
+        output_filename = naming.file_renamer(
+            state,
+            input_dir,
+            output_dir,
+            input_filename,
+            input_ext,
+            base_name,
+            output_ext,
+        )
+        if naming.selected_tokens(state):
+            output_filename = naming.file_renamer(
+                state,
+                input_dir,
+                output_dir,
+                input_filename,
+                input_ext,
+                naming.token_appender(state, input_text, base_name),
+                output_ext,
+            )
     if state.get("Format.Format_MediaType_SelectedItem") == "Sequence":
         output_filename = "image-%03d"
+    output_filename = naming.output_filename_spacing(state, output_filename)
     output_path = (
         ntpath.join(output_dir, output_filename + output_ext)
         if output_dir
@@ -169,6 +244,24 @@ def build_context(state: AxiomState) -> BuildContext:
         output_path=output_path,
         threads=_threads(state),
         ffmpeg=_ffmpeg_path(state),
+        ffprobe=_ffprobe_path(state),
+        batch_input_directory=batch_input_directory,
+        subtitle_paths=[
+            wrap_with_quotes(
+                str(path),
+                state.get("Configure.Shell_SelectedItem") or "CMD",
+                state.get("Configure.ProcessPriority_SelectedItem") or "Default",
+            )
+            for path in (state.values.get("_subtitle_paths") or [])
+        ],
+        audio_paths=[
+            wrap_with_quotes(
+                str(path),
+                state.get("Configure.Shell_SelectedItem") or "CMD",
+                state.get("Configure.ProcessPriority_SelectedItem") or "Default",
+            )
+            for path in (state.values.get("_audio_paths") or [])
+        ],
     )
 
 

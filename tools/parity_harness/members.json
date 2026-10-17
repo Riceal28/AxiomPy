@@ -58,6 +58,7 @@
         "youtubedlPath",
         "YouTubeDL_FFmpegPath",
         "InputPath",
+        "BatchExtCheck",
         "BatchInputDirectory",
         "OutputPath",
         "OutputPath_SingleFile",

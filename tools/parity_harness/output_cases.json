@@ -1,0 +1,138 @@
+[
+  {
+    "id": "out-tokens-basic",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\My Video.mkv",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Video.Video_Scale_SelectedItem": "1080p",
+      "Video.Video_Width_Text": "1920",
+      "Video.Video_Height_Text": "1080",
+      "Video.Video_ScreenFormat_SelectedItem": "Widescreen",
+      "Video.Video_ScalingAlgorithm_SelectedItem": "lanczos",
+      "Configure.OutputNaming_ListView_SelectedItems": [
+        "Input Ext",
+        "Video Codec",
+        "Pass",
+        "Video Bit Rate",
+        "Preset",
+        "Pixel Format",
+        "Frame Rate",
+        "Vsync",
+        "Size",
+        "Scaling",
+        "Audio Codec",
+        "Channel",
+        "Audio Bit Rate",
+        "Sample Rate",
+        "Bit Depth"
+      ]
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "out-tokens-spacing-dashes",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\My Video.mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Configure.OutputFileNameSpacing_SelectedItem": "Dashes",
+      "Configure.OutputNaming_ListView_SelectedItems": [
+        "Input Ext",
+        "Video Codec",
+        "Pass",
+        "Preset",
+        "Audio Codec",
+        "Audio Bit Rate"
+      ]
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "out-tokens-custom-output",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\My Video.mov",
+      "Main.Output_Text": "C:\\Output\\",
+      "Format.Format_Container_SelectedItem": "mkv",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Configure.OutputFileNameSpacing_SelectedItem": "Underscores",
+      "Configure.OutputNaming_ListView_SelectedItems": [
+        "Video Codec",
+        "Video CRF",
+        "Audio Codec",
+        "Sample Rate"
+      ]
+    },
+    "afterFormat": {
+      "Video.Video_Quality_SelectedItem": "Custom",
+      "Video.Video_Pass_SelectedItem": "CRF",
+      "Video.Video_CRF_Text": "18"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "out-no-tokens",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\Plain Name.mov",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD"
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  },
+  {
+    "id": "out-remove-tokens",
+    "state": {
+      "Main.Input_Text": "C:\\Input\\My Movie mkv x264 2-Pass p-medium yuv420p 1080p sa-lanczos AC3 [Tag].mkv",
+      "Format.Format_Container_SelectedItem": "mp4",
+      "Configure.Shell_SelectedItem": "CMD",
+      "Configure.InputFileNameTokens_SelectedItem": "Remove",
+      "Configure.OutputNaming_ListView_SelectedItems": ["Video Codec", "Audio Codec"]
+    },
+    "ffprobe": {
+      "inputVideoCodec": "h264",
+      "inputAudioCodec": "aac",
+      "inputVideoBitRate": "3000000",
+      "inputAudioBitRate": "192000",
+      "inputSize": "1920x1080",
+      "inputDuration": "5.0",
+      "inputFrameRate": "30"
+    },
+    "controls": {"threads": "-threads 0", "maxthreads": "8"}
+  }
+]

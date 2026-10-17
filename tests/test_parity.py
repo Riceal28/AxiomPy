@@ -17,6 +17,11 @@ GOLDEN_DIR = Path(__file__).parent / "golden"
 CASE_FILES = [
     Path(__file__).parent.parent / "tools" / "parity_harness" / "smoke_cases.json",
     Path(__file__).parent.parent / "tools" / "parity_harness" / "control_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "filter_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "batch_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "preset_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "output_cases.json",
+    Path(__file__).parent.parent / "tools" / "parity_harness" / "external_cases.json",
 ]
 
 

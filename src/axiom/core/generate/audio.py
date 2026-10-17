@@ -137,6 +137,12 @@ def audio_quality(ctx: BuildContext) -> str:
 
     bitrate = ""
     if quality == "Auto":
+        if ctx.batch:
+            if bitmode == "-q:a":
+                bitrate = str(_row(codec, "quality", quality).get("VBR") or "")
+            else:
+                bitrate = "%A" if ctx.shell == "CMD" else "$aBitrate"
+            return " ".join(part for part in (bitmode, bitrate) if part)
         input_rate = ctx.probe_value("inputAudioBitRate")
         if input_rate:
             if vbr:
@@ -223,4 +229,15 @@ def channel(state: AxiomState) -> str:
 
 
 def audio_metadata(state: AxiomState) -> str:
+    return ""
+
+
+def audio_mux(ctx: BuildContext) -> str:
+    state = ctx.state
+    if (
+        state.get("Audio.Audio_Codec_SelectedItem") != "None"
+        and state.get("Audio.Audio_Stream_SelectedItem") == "mux"
+        and ctx.audio_paths
+    ):
+        return "-i " + " -i ".join(path for path in ctx.audio_paths if path.strip())
     return ""

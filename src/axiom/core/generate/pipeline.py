@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..state import AxiomState
 from ..text import remove_line_breaks
-from . import audio, format as fmt, streams, subtitles, video
+from . import audio, filters_audio, format as fmt, streams, subtitles, video
 from .context import BuildContext, build_context, join_args
 
 
@@ -43,13 +43,13 @@ def _init(ctx: BuildContext) -> list[str]:
     return [ctx.ffmpeg, _overwrite(ctx.state)]
 
 
-def _input(ctx: BuildContext) -> list[str]:
+def _input(ctx: BuildContext, include_mux: bool = True) -> list[str]:
     state = ctx.state
     return [
         video.hw_accel_decode(state),
         "-i " + ctx.quote(ctx.input_path),
-        "",  # Audio.AudioMux - external files are not part of the JSON state
-        "",  # Subtitle.SubtitlesMux
+        audio.audio_mux(ctx) if include_mux else "",
+        subtitles.subtitle_mux_args(ctx) if include_mux else "",
         video.hw_accel_transcode(state),
         fmt.cut_start(state, ctx),
         fmt.cut_end(state, ctx),
@@ -131,7 +131,7 @@ def _audio_parts(ctx: BuildContext) -> list[str]:
         audio.sample_rate(state),
         audio.bit_depth(state),
         audio.channel(state),
-        "",  # Filters.Audio.AudioFilter
+        filters_audio.audio_filter(ctx),
         streams.audio_stream_maps(state, ctx),
         audio.audio_metadata(state),
     ]
@@ -180,14 +180,15 @@ def single_pass(state: AxiomState, ctx: BuildContext) -> str:
     return remove_line_breaks(join_args(*parts))
 
 
-def two_pass(state: AxiomState, ctx: BuildContext) -> str:
+def two_pass_commands(state: AxiomState, ctx: BuildContext) -> tuple[str, str]:
+    """Return ``(pass 1, pass 2)`` without choosing the shell's join operator."""
     pass_name = "2 Pass"
     video_parts_1 = (
         _video_pass1(ctx, pass_name) if _video_enabled(state) else ["-vn"]
     )
     pass1_parts = (
         _init(ctx)
-        + _input(ctx)
+        + _input(ctx, include_mux=False)
         + video_parts_1
         + ["-an", "-sn"]
         + [
@@ -210,6 +211,12 @@ def two_pass(state: AxiomState, ctx: BuildContext) -> str:
         + _tail(ctx)
     )
     pass2 = remove_line_breaks(join_args(*pass2_parts))
+
+    return pass1, pass2
+
+
+def two_pass(state: AxiomState, ctx: BuildContext) -> str:
+    pass1, pass2 = two_pass_commands(state, ctx)
     return pass1 + " && " + pass2
 
 
