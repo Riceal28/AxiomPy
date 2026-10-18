@@ -9,6 +9,35 @@ QMainWindow::separator {
     width: 4px;
     height: 4px;
 }
+QMenuBar {
+    background: #202225;
+    color: #e6e6e6;
+    border-bottom: 1px solid #34373d;
+}
+QMenuBar::item {
+    background: transparent;
+    padding: 4px 10px;
+}
+QMenuBar::item:selected,
+QMenuBar::item:pressed {
+    background: #343840;
+}
+QMenu {
+    background: #25272b;
+    color: #e6e6e6;
+    border: 1px solid #3b3f46;
+    padding: 4px;
+}
+QMenu::item {
+    padding: 5px 24px;
+}
+QMenu::item:selected {
+    background: #3a6ea5;
+    color: #ffffff;
+}
+QMenu::item:disabled {
+    color: #6f747c;
+}
 QTabWidget::pane {
     border: 1px solid #34373d;
     background: #25272b;

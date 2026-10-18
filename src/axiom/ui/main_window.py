@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -425,6 +426,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
         self._build_docks()
+        self._build_view_menu()
         self._build_status()
         self._install_wheel_guard()
         self._base_tooltips = {
@@ -623,6 +625,38 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(self.script_dock, self.batch_dock)
         self.resizeDocks([self.script_dock], [260], Qt.Vertical)
         self.batch_dock.hide()
+
+    def _build_view_menu(self) -> None:
+        """Expose dock visibility so a closed panel can always be reopened."""
+        view_menu = self.menuBar().addMenu("&View")
+        self.view_menu = view_menu
+        self.script_dock_action = self._add_dock_view_action(
+            view_menu,
+            self.script_dock,
+            "&Script Panel",
+        )
+        self.log_dock_action = self._add_dock_view_action(
+            view_menu,
+            self.log_dock,
+            "&Log Panel",
+        )
+        self.batch_dock_action = self._add_dock_view_action(
+            view_menu,
+            self.batch_dock,
+            "&Batch Queue",
+        )
+
+    def _add_dock_view_action(
+        self,
+        menu: QMenu,
+        dock: QDockWidget,
+        text: str,
+    ) -> QAction:
+        action = dock.toggleViewAction()
+        action.setText(text)
+        action.setObjectName(f"{dock.objectName()}ToggleAction")
+        menu.addAction(action)
+        return action
 
     def _build_status(self) -> None:
         status = QStatusBar(self)

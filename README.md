@@ -120,7 +120,8 @@ axiom-cli --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --pri
 5. Run the conversion, or run the same command externally.
 
 Input/Output is a dedicated panel. The Script and Log docks are resizable and their
-layout is included in workspace snapshots.
+layout is included in workspace snapshots. Closing a dock hides it; use **View** to
+reopen **Script Panel**, **Log Panel** or **Batch Queue**.
 
 New installations start with **MP4** as the container and **all** audio streams
 selected. Choosing a preset locks the preset identity controls (container, codecs,

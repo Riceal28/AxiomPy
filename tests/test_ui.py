@@ -54,6 +54,32 @@ def test_default_window_is_720p_with_separate_file_panel(qtbot):
     )
 
 
+def test_view_menu_restores_closed_docks(qtbot, tmp_path):
+    window = MainWindow(notify_path=tmp_path / "notify.json")
+    qtbot.addWidget(window)
+    window.show()
+    window.batch_check.setChecked(True)
+
+    for dock in (window.script_dock, window.log_dock, window.batch_dock):
+        dock.close()
+        assert not dock.isVisible()
+
+    for action in (
+        window.script_dock_action,
+        window.log_dock_action,
+        window.batch_dock_action,
+    ):
+        assert not action.isChecked()
+        action.trigger()
+
+    assert window.script_dock.isVisible()
+    assert window.log_dock.isVisible()
+    assert window.batch_dock.isVisible()
+    assert window.script_dock_action.isChecked()
+    assert window.log_dock_action.isChecked()
+    assert window.batch_dock_action.isChecked()
+
+
 def test_font_size_applies_immediately(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)

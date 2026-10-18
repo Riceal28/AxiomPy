@@ -109,7 +109,8 @@ axiom-cli --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --pri
 5. 运行转换，或在外部执行同一命令。
 
 Input/Output 是独立面板。Script 与 Log 停靠窗口可调整大小，其布局也会被工作区快照
-保存。
+保存。关闭停靠面板后，可通过 **View** 菜单重新打开 **Script Panel**、
+**Log Panel** 或 **Batch Queue**。
 
 首次启动默认使用 **MP4** 容器，并选择 **all**（全部）音频流。选择预设后，预设
 固定的容器、编解码器、质量、流选择和硬件路径会锁定；锁定控件会灰显并在悬停时
