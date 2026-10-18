@@ -3,6 +3,26 @@
 All notable changes to AxiomPy are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.4] - 2026-10-18
+
+### Added
+
+- Added a **View** menu with checkable entries for **Script Panel**,
+  **Log Panel** and **Batch Queue**.
+
+### Fixed
+
+- Closing the Script, Log or Batch Queue dock no longer leaves the panel
+  unreachable. Hidden docks can be restored from the View menu, including after
+  a workspace restore.
+
+### Changed
+
+- Updated GitHub Actions checkout and setup-python to v7.
+- Updated PyInstaller to 6.22.3 and verified both portable packages with it.
+- Dependency upgrades that require Python 3.10 or newer were not merged because
+  AxiomPy still supports Python 3.9.
+
 ## [0.2.3] - 2026-10-17
 
 ### Added
