@@ -3,6 +3,17 @@
 All notable changes to AxiomPy are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.5] - 2026-11-20
+
+### Fixed
+
+- Size presets now supply their standard dimensions when the disabled width or
+  height field is empty. Selecting `1080p` with `lanczos` now generates
+  `scale=1920:-2:flags=lanczos` instead of the invalid `scale=:-2:flags=lanczos`.
+  UHD and Blu-ray presets are corrected in the same way.
+- Aggregate batch progress is monotonic, so a transient final poll can no longer
+  overwrite completed progress with a lower value.
+
 ## [0.2.4] - 2026-10-18
 
 ### Added
