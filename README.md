@@ -92,6 +92,8 @@ Clone the repository and create a virtual environment. The editable install puts
 the `axiom` package on the virtual environment's import path; `pip` installs the
 Python dependencies but does not install FFmpeg.
 
+**PowerShell**
+
 ```powershell
 git clone https://github.com/Riceal28/AxiomPy.git
 cd AxiomPy
@@ -101,14 +103,35 @@ python -m venv .venv
 & .\.venv\Scripts\python.exe -m axiom
 ```
 
-Using the explicit `.venv` executable avoids PowerShell execution-policy issues
-with `Activate.ps1`. The installed GUI launcher is also available as
-`.\.venv\Scripts\axiom-gui.exe`.
+**Command Prompt (CMD)**
+
+```bat
+git clone https://github.com/Riceal28/AxiomPy.git
+cd AxiomPy
+python -m venv .venv
+".venv\Scripts\python.exe" -m pip install --upgrade pip
+".venv\Scripts\python.exe" -m pip install -e .
+".venv\Scripts\python.exe" -m axiom
+```
+
+Both examples call the virtual environment directly, so no activation is
+required. The installed GUI launcher is also available as
+`.venv\Scripts\axiom-gui.exe`.
 
 Put `ffmpeg.exe`, `ffprobe.exe` and `ffplay.exe` on `PATH`, or select their paths
 in **Settings → Config**. Before the first conversion, verify the installation:
 
+**PowerShell**
+
 ```powershell
+ffmpeg -version
+ffprobe -version
+ffplay -version
+```
+
+**Command Prompt (CMD)**
+
+```bat
 ffmpeg -version
 ffprobe -version
 ffplay -version
@@ -121,9 +144,18 @@ checkout does not provide bundled binaries.
 
 The CLI consumes the same JSON case format as the parity harness:
 
+**PowerShell**
+
 ```powershell
 & .\.venv\Scripts\python.exe -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
 & .\.venv\Scripts\axiom-cli.exe --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --print resolved
+```
+
+**Command Prompt (CMD)**
+
+```bat
+".venv\Scripts\python.exe" -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
+".venv\Scripts\axiom-cli.exe" --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --print resolved
 ```
 
 ## Using the application
