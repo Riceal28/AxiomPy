@@ -36,6 +36,24 @@ SIZE_AUTO_CODECS = {
     "WebP",
 }
 
+SIZE_PRESET_DIMENSIONS: dict[str, tuple[str, str]] = {
+    "8K": ("8192", "4320"),
+    "8K UHD": ("7680", "4320"),
+    "4K": ("4096", "2160"),
+    "4K UHD": ("3840", "2160"),
+    "2K": ("2048", "1080"),
+    "1600p": ("2560", "1600"),
+    "1440p": ("2560", "1440"),
+    "1200p": ("1920", "1200"),
+    "1080p": ("1920", "1080"),
+    "900p": ("1600", "900"),
+    "720p": ("1280", "720"),
+    "576p": ("1024", "576"),
+    "480p": ("854", "480"),
+    "320p": ("568", "320"),
+    "240p": ("426", "240"),
+}
+
 IMAGE_CODECS = {"JPEG", "PNG", "WebP"}
 
 
@@ -391,6 +409,11 @@ def _size_auto(codec: str) -> str:
     return "-1"
 
 
+def _preset_dimension(size: str, axis: int) -> str:
+    dimensions = SIZE_PRESET_DIMENSIONS.get(size)
+    return dimensions[axis] if dimensions else ""
+
+
 def add_scale_filter(ctx: BuildContext) -> None:
     state = ctx.state
     codec = state.get("Video.Video_Codec_SelectedItem")
@@ -412,14 +435,16 @@ def add_scale_filter(ctx: BuildContext) -> None:
 
     if size != "Custom":
         if screen in ("auto", "Widescreen", "Ultrawide"):
-            width = width_text
+            width = width_text or _preset_dimension(size, 0)
             height = _size_auto(codec)
         elif screen == "Full Screen":
             width = _size_auto(codec)
-            height = height_text
+            height = height_text or _preset_dimension(size, 1)
         else:
-            width = width_text
+            width = width_text or _preset_dimension(size, 0)
             height = _size_auto(codec)
+        if not width or not height:
+            return
         ctx.v_filters.append(f"scale={width}:{height}" + _scaling_algorithm(state))
         return
 

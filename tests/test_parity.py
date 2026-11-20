@@ -55,6 +55,11 @@ def test_python_matches_csharp_oracle(case):
     expected_args = expected["args"]
     if case.get("expectedOverride") == "custom-rate-control":
         expected_args = CUSTOM_RATE_GOLDENS[case["id"]]
+    if "scaleCorrection" in case:
+        expected_args = expected_args.replace(
+            "scale=:-2",
+            str(case["scaleCorrection"]),
+        )
     if case.get("expectedOverride") == "amf-qvbr":
         # Deliberate correction: generic -crf is not an AMF encoder option.
         # The C# oracle still emits it, so transform the captured expectation.

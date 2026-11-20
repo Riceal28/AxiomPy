@@ -196,6 +196,11 @@ def test_batch_progress_reports_current_file_and_total(tmp_path, monkeypatch):
     assert monitor.poll() == 1.0
     assert monitor.finished is True
 
+    # A final poll can race with a transient partial read.  Aggregate progress
+    # must remain monotonic so completion is not overwritten by stale data.
+    (tmp_path / "progress-two.mp4-p1.txt").write_text("", encoding="utf-8")
+    assert monitor.poll() == 1.0
+
 
 def test_real_batch_run_emits_total_progress(tmp_path, monkeypatch):
     inputs = tmp_path / "inputs"

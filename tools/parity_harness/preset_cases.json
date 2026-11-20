@@ -816,6 +816,7 @@
   {
     "id": "prs-uhd",
     "expectedOverride": "custom-rate-control",
+    "scaleCorrection": "scale=3840:-2",
     "preset": "UHD",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",
@@ -838,6 +839,7 @@
   },
   {
     "id": "prs-blu-ray",
+    "scaleCorrection": "scale=1920:-2",
     "preset": "Blu-ray",
     "state": {
       "Main.Input_Text": "C:\\Input\\clip.mkv",

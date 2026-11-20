@@ -451,7 +451,8 @@ class _ProgressMonitor(threading.Thread):
         self.last_duration = self._duration_for(
             self.batch_files[current_index]
         )
-        total = sum(fractions) / len(fractions)
+        calculated_total = sum(fractions) / len(fractions)
+        total = max(calculated_total, self._last_total or 0.0)
         if all(
             reports_for_file[index] and fractions[index] >= 1.0
             for index in range(len(fractions))
