@@ -21,7 +21,7 @@ body:
     attributes:
       label: Environment
       description: Windows version, Python version and PySide6 version
-      placeholder: Windows 11 24H2, Python 3.9.10, PySide6 6.9.3
+      placeholder: Windows 11 24H2, Python 3.14.0, PySide6 6.12.0
     validations:
       required: true
 

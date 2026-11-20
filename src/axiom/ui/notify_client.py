@@ -68,8 +68,15 @@ class NotifyClient(QObject):
             return False
 
         request = QNetworkRequest(url)
+        header_names = set()
         for name, value in rendered.headers:
             request.setRawHeader(name.encode("utf-8"), value.encode("utf-8"))
+            header_names.add(name.casefold())
+        if "content-type" not in header_names:
+            # Qt 6.12 adds a default form Content-Type to POST requests when
+            # this header is absent.  Notify headers disabled in the UI must
+            # remain absent, so suppress that new default explicitly.
+            request.setRawHeader(b"Content-Type", b"")
         request.setTransferTimeout(max(1000, int(config.timeout_ms)))
         if method == "GET":
             reply = (

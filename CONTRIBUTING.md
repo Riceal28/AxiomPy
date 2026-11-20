@@ -13,7 +13,8 @@ updates and focused pull requests are welcome.
 
 ## Development setup
 
-AxiomPy targets Windows 10/11 and Python 3.9–3.13.
+AxiomPy targets Windows 10/11 and Python 3.9–3.14. Python 3.9–3.13 use
+PySide6 6.9.x; Python 3.14 uses PySide6 6.11–6.12.
 
 Clone the repository and run from its root:
 

@@ -3,6 +3,13 @@
 All notable changes to AxiomPy are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Source installs now support Python 3.14. Python 3.9–3.13 continue to use
+  PySide6 6.9.x, while Python 3.14 uses PySide6 6.11–6.12.
+
 ## [0.2.5] - 2026-11-20
 
 ### Fixed

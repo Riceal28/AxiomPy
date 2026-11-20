@@ -3,8 +3,8 @@
 [English](README.md) | **简体中文**
 
 [![CI](https://github.com/Riceal28/AxiomPy/actions/workflows/ci.yml/badge.svg)](https://github.com/Riceal28/AxiomPy/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.9--3.13-3776AB)](https://www.python.org/)
-[![PySide6](https://img.shields.io/badge/PySide6-6.9.x-41CD52)](https://doc.qt.io/qtforpython/)
+[![Python](https://img.shields.io/badge/python-3.9--3.14-3776AB)](https://www.python.org/)
+[![PySide6](https://img.shields.io/badge/PySide6-6.9%20%7C%206.11--6.12-41CD52)](https://doc.qt.io/qtforpython/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6)](https://www.microsoft.com/windows/)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
@@ -41,8 +41,8 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 | 组件 | 要求 |
 |---|---|
 | 操作系统 | Windows 10 或 Windows 11 |
-| Python（源码运行） | Python 3.9–3.13 |
-| 图形界面 | PySide6 6.9.x |
+| Python（源码运行） | Python 3.9–3.14 |
+| 图形界面 | Python 3.9–3.13 使用 PySide6 6.9.x；Python 3.14 使用 PySide6 6.11–6.12 |
 | FFmpeg | `ffmpeg`、`ffprobe` 和 `ffplay` 位于 `PATH`、在设置中指定，或随便携版打包 |
 
 当前版本以 Windows 为首要支持平台。核心层不依赖 Qt，平台层保留了 POSIX 接口，

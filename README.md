@@ -3,8 +3,8 @@
 **English** | [简体中文](README.zh-CN.md)
 
 [![CI](https://github.com/Riceal28/AxiomPy/actions/workflows/ci.yml/badge.svg)](https://github.com/Riceal28/AxiomPy/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.9--3.13-3776AB)](https://www.python.org/)
-[![PySide6](https://img.shields.io/badge/PySide6-6.9.x-41CD52)](https://doc.qt.io/qtforpython/)
+[![Python](https://img.shields.io/badge/python-3.9--3.14-3776AB)](https://www.python.org/)
+[![PySide6](https://img.shields.io/badge/PySide6-6.9%20%7C%206.11--6.12-41CD52)](https://doc.qt.io/qtforpython/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6)](https://www.microsoft.com/windows/)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
@@ -47,8 +47,8 @@ option as raw text.
 | Component | Requirement |
 |---|---|
 | Operating system | Windows 10 or Windows 11 |
-| Python (source install) | Python 3.9–3.13 |
-| GUI toolkit | PySide6 6.9.x |
+| Python (source install) | Python 3.9–3.14 |
+| GUI toolkit | PySide6 6.9.x on Python 3.9–3.13; PySide6 6.11–6.12 on Python 3.14 |
 | FFmpeg | `ffmpeg`, `ffprobe` and `ffplay` on `PATH`, configured in Settings, or bundled with a portable build |
 
 The source code is Windows-first. The core layer is Qt-free and the platform layer
