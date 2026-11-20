@@ -88,27 +88,42 @@ bundled a package-manager shim instead of the real FFmpeg binaries; download rel
 
 ### From source
 
-Clone the repository, then run from its root:
+Clone the repository and create a virtual environment. The editable install puts
+the `axiom` package on the virtual environment's import path; `pip` installs the
+Python dependencies but does not install FFmpeg.
 
 ```powershell
 git clone https://github.com/Riceal28/AxiomPy.git
 cd AxiomPy
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python -m axiom
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip
+& .\.venv\Scripts\python.exe -m pip install -e .
+& .\.venv\Scripts\python.exe -m axiom
 ```
 
-The installed GUI launcher is also available as `axiom-gui`.
+Using the explicit `.venv` executable avoids PowerShell execution-policy issues
+with `Activate.ps1`. The installed GUI launcher is also available as
+`.\.venv\Scripts\axiom-gui.exe`.
+
+Put `ffmpeg.exe`, `ffprobe.exe` and `ffplay.exe` on `PATH`, or select their paths
+in **Settings → Config**. Before the first conversion, verify the installation:
+
+```powershell
+ffmpeg -version
+ffprobe -version
+ffplay -version
+```
+
+If those commands are unavailable, install a Windows FFmpeg build. The source
+checkout does not provide bundled binaries.
 
 ### Command line
 
 The CLI consumes the same JSON case format as the parity harness:
 
 ```powershell
-python -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
-axiom-cli --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --print resolved
+& .\.venv\Scripts\python.exe -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
+& .\.venv\Scripts\axiom-cli.exe --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --print resolved
 ```
 
 ## Using the application

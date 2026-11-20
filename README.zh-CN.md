@@ -77,27 +77,39 @@ AxiomPy 是一个用于构建、检查和运行 FFmpeg 命令的 Windows 桌面�
 
 ### 从源码运行
 
-克隆仓库后，在项目根目录执行：
+克隆仓库并创建虚拟环境。可编辑安装会把 `axiom` 包加入该虚拟环境的导入路径；
+`pip` 只安装 Python 依赖，不会安装 FFmpeg。
 
 ```powershell
 git clone https://github.com/Riceal28/AxiomPy.git
 cd AxiomPy
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python -m axiom
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip
+& .\.venv\Scripts\python.exe -m pip install -e .
+& .\.venv\Scripts\python.exe -m axiom
 ```
 
-安装后也可以使用 `axiom-gui` 启动图形界面。
+直接调用 `.venv` 中的 Python 可以避免 PowerShell 执行策略阻止
+`Activate.ps1`。安装后也可以使用 `.\.venv\Scripts\axiom-gui.exe` 启动图形界面。
+
+请将 `ffmpeg.exe`、`ffprobe.exe` 和 `ffplay.exe` 加入 `PATH`，或在
+**设置 → Config** 中指定路径。首次转换前可检查安装情况：
+
+```powershell
+ffmpeg -version
+ffprobe -version
+ffplay -version
+```
+
+如果命令不可用，请安装 Windows FFmpeg 构建；源码运行不会自带这些二进制文件。
 
 ### 命令行
 
 CLI 使用与一致性测试工具相同的 JSON 用例格式：
 
 ```powershell
-python -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
-axiom-cli --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --print resolved
+& .\.venv\Scripts\python.exe -m axiom.cli --case tools/parity_harness/smoke_cases.json --id webm-vp8-crf-25
+& .\.venv\Scripts\axiom-cli.exe --case tools/parity_harness/control_cases.json --id ctl-mp4-x264 --print resolved
 ```
 
 ## 使用说明
